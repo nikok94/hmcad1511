@@ -43,17 +43,24 @@ entity high_speed_clock_to_serdes is
 
         iodelay_busy        : out std_logic;
 
-        div_clk_bufg        : out std_logic;
-        serdesclk0          : out std_logic;
-        serdesclk1          : out std_logic;
-        serdesstrobe        : out std_logic 
+        div_clk_bufg_0      : out std_logic;
+        serdesclk0_0        : out std_logic;
+        serdesclk1_0        : out std_logic;
+        serdesstrobe_0      : out std_logic;
+        
+        div_clk_bufg_1      : out std_logic;
+        serdesclk0_1        : out std_logic;
+        serdesclk1_1        : out std_logic;
+        serdesstrobe_1      : out std_logic 
+        
     );
 end high_speed_clock_to_serdes;
 
 architecture Behavioral of high_speed_clock_to_serdes is
-    type calib_state_machine is (idle, rst, calib, ready, calib_done);
+    type calib_state_machine is (idle, dalay_rst, calib, ready, calib_done);
     signal state, next_state : calib_state_machine;
-    signal div_clk          : std_logic;
+    signal div_clk_0        : std_logic;
+    signal div_clk_1        : std_logic;
     signal mstr_dly         : std_logic;
     signal slve_dly         : std_logic;
     signal master_dly_busy  : std_logic;
@@ -65,14 +72,12 @@ architecture Behavioral of high_speed_clock_to_serdes is
 
 begin
 
-div_clk_bufg_ins : BUFG port map ( I => div_clk, O => div_clk_bufg );
-
 busy <= master_dly_busy or slave_dly_busy;
 
 iodelay_busy <= busy;
 
 sync_proc :
-    process(iodelay_clk)
+    process(clk)
     begin
       if rising_edge(clk) then
         if rst = '1' then 
@@ -88,12 +93,12 @@ data_proc:
     begin
     iodelay_rst <= '0';
     iodelay_cal <= '0';
-      case
+      case state is
         when idle =>
           calib_ok <= '0';
         when calib =>
           iodelay_cal <= '1';
-        when rst =>
+        when dalay_rst =>
           calib_ok <= '1';
           iodelay_rst <= '1';
         when others =>
@@ -109,17 +114,17 @@ next_state_machine_process:
             if cal = '1' then
               next_state <= calib;
             end if;
-          when calib then
+          when calib => 
             next_state <= ready;
-          when ready then
+          when ready =>
             if (busy = '0') then
               if (calib_ok = '1') then
                 next_state <= calib_done;
               else
-                next_state <= rst;
+                next_state <= dalay_rst;
               end if;
             end if;
-          when rst => 
+          when dalay_rst => 
             next_state <= calib_done;
           when calib_done => 
             if cal = '1' then
@@ -132,7 +137,7 @@ next_state_machine_process:
 
 MASTER_IODELAY2_inst : IODELAY2
    generic map (
-      COUNTER_WRAPAROUND => "WRAPAROUND", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
+      COUNTER_WRAPAROUND => "STAY_AT_LIMIT", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
       DATA_RATE => "DDR",                 -- "SDR" or "DDR" 
       DELAY_SRC => "IDATAIN",                  -- "IO", "ODATAIN" or "IDATAIN" 
       IDELAY2_VALUE => 0,                 -- Delay value when IDELAY_MODE="PCI" (0-255)
@@ -164,7 +169,7 @@ MASTER_IODELAY2_inst : IODELAY2
    
 SLAVE_IODELAY2_inst : IODELAY2
    generic map (
-      COUNTER_WRAPAROUND => "WRAPAROUND", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
+      COUNTER_WRAPAROUND => "STAY_AT_LIMIT", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
       DATA_RATE => "DDR",                 -- "SDR" or "DDR" 
       DELAY_SRC => "IDATAIN",                  -- "IO", "ODATAIN" or "IDATAIN" 
       IDELAY2_VALUE => 0,                 -- Delay value when IDELAY_MODE="PCI" (0-255)
@@ -194,23 +199,19 @@ SLAVE_IODELAY2_inst : IODELAY2
       T => '1'                -- 1-bit input: 3-state input signal
    );
 
-
-
-   BUFIO2_2CLK_inst : BUFIO2_2CLK
+BUFIO2_2CLK_inst_0 : BUFIO2_2CLK
    generic map (
       DIVIDE => 3  -- DIVCLK divider (3-8)
    )
    port map (
-      DIVCLK => div_clk,             -- 1-bit output: Divided clock output
-      IOCLK => serdesclk0,               -- 1-bit output: I/O output clock
-      SERDESSTROBE => serdesstrobe, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
+      DIVCLK => div_clk_0,             -- 1-bit output: Divided clock output
+      IOCLK => serdesclk0_0,               -- 1-bit output: I/O output clock
+      SERDESSTROBE => serdesstrobe_0, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
       I => mstr_dly,                       -- 1-bit input: Clock input (connect to IBUFG)
       IB => slve_dly                      -- 1-bit input: Secondary clock input
    );
 
-
-
-BUFIO2_clk1_inst : BUFIO2
+BUFIO2_clk1_inst_0 : BUFIO2
    generic map (
       DIVIDE => 8,           -- DIVCLK divider (1,3-8)
       DIVIDE_BYPASS => FALSE, -- Bypass the divider circuitry (TRUE/FALSE)
@@ -219,9 +220,39 @@ BUFIO2_clk1_inst : BUFIO2
    )
    port map (
       DIVCLK => open,             -- 1-bit output: Divided clock output
-      IOCLK => serdesclk1,               -- 1-bit output: I/O output clock
+      IOCLK => serdesclk1_0,               -- 1-bit output: I/O output clock
       SERDESSTROBE => open, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
       I => slve_dly                        -- 1-bit input: Clock input (connect to IBUFG)
    );
+
+BUFIO2_2CLK_inst_1 : BUFIO2_2CLK
+   generic map (
+      DIVIDE => 3  -- DIVCLK divider (3-8)
+   )
+   port map (
+      DIVCLK => div_clk_1,             -- 1-bit output: Divided clock output
+      IOCLK => serdesclk0_1,               -- 1-bit output: I/O output clock
+      SERDESSTROBE => serdesstrobe_1, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
+      I => mstr_dly,                       -- 1-bit input: Clock input (connect to IBUFG)
+      IB => slve_dly                      -- 1-bit input: Secondary clock input
+   );
+
+BUFIO2_clk1_inst_1 : BUFIO2
+   generic map (
+      DIVIDE => 8,           -- DIVCLK divider (1,3-8)
+      DIVIDE_BYPASS => FALSE, -- Bypass the divider circuitry (TRUE/FALSE)
+      I_INVERT => TRUE,     -- Invert clock (TRUE/FALSE)
+      USE_DOUBLER => FALSE   -- Use doubler circuitry (TRUE/FALSE)
+   )
+   port map (
+      DIVCLK => open,             -- 1-bit output: Divided clock output
+      IOCLK => serdesclk1_1,               -- 1-bit output: I/O output clock
+      SERDESSTROBE => open, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
+      I => slve_dly                        -- 1-bit input: Clock input (connect to IBUFG)
+   );
+
+
+div_clk_bufg_ins_0 : BUFG port map ( I => div_clk_0, O => div_clk_bufg_0 );
+div_clk_bufg_ins_1 : BUFG port map ( I => div_clk_1, O => div_clk_bufg_1 );
 
 end Behavioral;
