@@ -42,8 +42,9 @@ use work.chipscope_vio;
 entity tst_lck_lock is
     Port (
         in_clk_20MHz    : in std_logic;
-        adc_fclk_p      : in std_logic;
-        adc_fclk_n      : in std_logic;
+--        calib           : in std_logic;
+       -- adc_fclk_p      : in std_logic;
+       -- adc_fclk_n      : in std_logic;
         adc_lck_p       : in std_logic;
         adc_lck_n       : in std_logic;
         adc_dx_a_p      : in std_logic_vector(3 downto 0);
@@ -218,12 +219,8 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       serdesstrobe   		=> serdesstrobe_0,
       
       data_8bit_out         => adc_data_a_8bit(i),
-	  cal        			=> iodelay_calib,
-	  iodelay_ce			=> iodelay_ce,
-	  iodelay_inc			=> vio_calib_vector(1),
-      clk                   => div_clk_bufg_0,
-      iodelay_busy                  => open,
-	  bitslip				=> bitslip,
+	  start_calib           => iodelay_calib,
+      calib_busy            => open,
 	  rst					=> '0'
     );
 
@@ -236,12 +233,8 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       clkdiv         		=> div_clk_bufg_0,
       serdesstrobe   		=> serdesstrobe_0,
       data_8bit_out         => adc_data_b_8bit(i),
-	  cal        			=> iodelay_calib,
-	  iodelay_ce			=> iodelay_ce,
-	  iodelay_inc			=> vio_calib_vector(1),
-      clk                   => div_clk_bufg_0,
-      iodelay_busy                  => open,
-	  bitslip				=> bitslip,
+	  start_calib           => iodelay_calib,
+      calib_busy            => open,
 	  rst					=> '0'
     );
 end generate;
@@ -256,12 +249,8 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       clkdiv        		=> div_clk_bufg_1,
       serdesstrobe  		=> serdesstrobe_1,
       data_8bit_out         => adc_data_a_8bit(i),
-	  cal        			=> iodelay_calib,
-	  iodelay_ce			=> iodelay_ce,
-	  iodelay_inc			=> vio_calib_vector(1),
-      clk                   => div_clk_bufg_1,
-      iodelay_busy          => open,
-	  bitslip				=> bitslip,
+	  start_calib           => iodelay_calib,
+      calib_busy            => open,
 	  rst					=> '0'
     );
 
@@ -274,12 +263,8 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       clkdiv         		=> div_clk_bufg_1,
       serdesstrobe   		=> serdesstrobe_1,
       data_8bit_out         => adc_data_b_8bit(i),
-	  cal        			=> iodelay_calib,
-	  iodelay_ce			=> iodelay_ce,
-	  iodelay_inc			=> vio_calib_vector(1),
-      clk                   => div_clk_bufg_1,
-	  bitslip				=> bitslip,
-      iodelay_busy                  => open,
+	  start_calib           => iodelay_calib,
+      calib_busy            => open,
 	  rst					=> '0'
     );
 end generate;
