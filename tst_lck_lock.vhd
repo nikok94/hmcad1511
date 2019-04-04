@@ -41,7 +41,9 @@ use work.chipscope_vio;
 
 entity tst_lck_lock is
     Port (
-	    in_clk_20MHz	: in std_logic;
+        in_clk_20MHz    : in std_logic;
+        adc_fclk_p      : in std_logic;
+        adc_fclk_n      : in std_logic;
         adc_lck_p       : in std_logic;
         adc_lck_n       : in std_logic;
         adc_dx_a_p      : in std_logic_vector(3 downto 0);
@@ -67,7 +69,7 @@ architecture Behavioral of tst_lck_lock is
 
     signal ila_control                              : std_logic_vector(35 downto 0);
     signal div_clk_bufg_0                           : std_logic;
-    signal div_clk_bufg_2                           : std_logic;
+    signal div_clk_bufg_1                           : std_logic;
 	
 	signal vio_calib_vector							: std_logic_vector(7 downto 0);
 	signal vio_calib_control					    : std_logic_vector(35 downto 0);
@@ -93,6 +95,9 @@ architecture Behavioral of tst_lck_lock is
     signal ce_sync_vect                             : std_logic_vector(3 downto 0);
     signal iodelay_ce                               : std_logic;
     signal iodelay_inc                              : std_logic;
+    
+    signal adc_fclk_bufg                            : std_logic;
+    signal fclk_bufio                               : std_logic;
 
 begin
 
@@ -149,7 +154,31 @@ PLL_BASE_inst : PLL_BASE
     bufg_inst : BUFG port map ( I => pll_clk0, O => CLK_100MHz);
    CLKFBIN <= CLKFBOUT;
 
-IBUFGDS_inst : IBUFGDS
+--IBUFGDS_FCLK_inst : IBUFGDS
+--   generic map (
+--      IBUF_LOW_PWR => TRUE, -- Low power (TRUE) vs. performance (FALSE) setting for referenced I/O standards
+--      IOSTANDARD => "DEFAULT")
+--   port map (
+--      O => adc_lck_bufg,  -- Clock buffer output
+--      I => adc_fclk_p,  -- Diff_p clock buffer input
+--      IB => adc_fclk_n -- Diff_n clock buffer input
+--   );
+--
+--BUFIO2_FCLK_inst : BUFIO2
+--   generic map (
+--      DIVIDE => 1,           -- DIVCLK divider (1,3-8)
+--      DIVIDE_BYPASS => TRUE, -- Bypass the divider circuitry (TRUE/FALSE)
+--      I_INVERT => FALSE,     -- Invert clock (TRUE/FALSE)
+--      USE_DOUBLER => FALSE   -- Use doubler circuitry (TRUE/FALSE)
+--   )
+--   port map (
+--      DIVCLK => DIVCLK,             -- 1-bit output: Divided clock output
+--      IOCLK => open,               -- 1-bit output: I/O output clock
+--      SERDESSTROBE => open, -- 1-bit output: Output SERDES strobe (connect to ISERDES2/OSERDES2)
+--      I => adc_fclk_bufg            -- 1-bit input: Clock input (connect to IBUFG)
+--   );
+
+IBUFGDS_CLK_inst : IBUFGDS
    generic map (
       IBUF_LOW_PWR => TRUE, -- Low power (TRUE) vs. performance (FALSE) setting for referenced I/O standards
       IOSTANDARD => "DEFAULT")
@@ -161,17 +190,17 @@ IBUFGDS_inst : IBUFGDS
 
 high_speed_clock_to_serdes_1 : entity high_speed_clock_to_serdes
     Port map( 
-		in_clk_from_bufg	=> adc_lck_bufg,
-		div_clk_bufg		=> div_clk_bufg_0,	
-		serdesclk0		    => IOCLK0_0,
-		serdesclk1		    => IOCLK1_0,
-		serdesstrobe		=> serdesstrobe_0
-	);
+        in_clk_from_bufg    => adc_lck_bufg,
+        div_clk_bufg        => div_clk_bufg_0,
+        serdesclk0          => IOCLK0_0,
+        serdesclk1          => IOCLK1_0,
+        serdesstrobe        => serdesstrobe_0
+    );
 
 high_speed_clock_to_serdes_2 : entity high_speed_clock_to_serdes
     Port map( 
         in_clk_from_bufg    => adc_lck_bufg,
-        div_clk_bufg        => open,
+        div_clk_bufg        => div_clk_bufg_1,
         serdesclk0          => IOCLK0_1,
         serdesclk1          => IOCLK1_1,
         serdesstrobe        => serdesstrobe_1
@@ -187,11 +216,13 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       ioclk1          		=> IOCLK1_0,
       clkdiv         		=> div_clk_bufg_0,
       serdesstrobe   		=> serdesstrobe_0,
+      
       data_8bit_out         => adc_data_a_8bit(i),
-	  iodelay_calib			=> iodelay_calib,
+	  cal        			=> iodelay_calib,
 	  iodelay_ce			=> iodelay_ce,
 	  iodelay_inc			=> vio_calib_vector(1),
-      iodalay_clk           => CLK_100MHz,
+      clk                   => div_clk_bufg_0,
+      iodelay_busy                  => open,
 	  bitslip				=> bitslip,
 	  rst					=> '0'
     );
@@ -205,10 +236,11 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       clkdiv         		=> div_clk_bufg_0,
       serdesstrobe   		=> serdesstrobe_0,
       data_8bit_out         => adc_data_b_8bit(i),
-	  iodelay_calib			=> iodelay_calib,
+	  cal        			=> iodelay_calib,
 	  iodelay_ce			=> iodelay_ce,
 	  iodelay_inc			=> vio_calib_vector(1),
-      iodalay_clk           => CLK_100MHz,
+      clk                   => div_clk_bufg_0,
+      iodelay_busy                  => open,
 	  bitslip				=> bitslip,
 	  rst					=> '0'
     );
@@ -221,13 +253,14 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       data_in_n             => adc_dx_a_n(i),
       ioclk0        		=> IOCLK0_1,
       ioclk1        		=> IOCLK1_1,
-      clkdiv        		=> div_clk_bufg_0,
+      clkdiv        		=> div_clk_bufg_1,
       serdesstrobe  		=> serdesstrobe_1,
       data_8bit_out         => adc_data_a_8bit(i),
-	  iodelay_calib			=> iodelay_calib,
+	  cal        			=> iodelay_calib,
 	  iodelay_ce			=> iodelay_ce,
 	  iodelay_inc			=> vio_calib_vector(1),
-      iodalay_clk           => CLK_100MHz,
+      clk                   => div_clk_bufg_1,
+      iodelay_busy          => open,
 	  bitslip				=> bitslip,
 	  rst					=> '0'
     );
@@ -238,14 +271,15 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       data_in_n             => adc_dx_b_n(i),
       ioclk0         		=> IOCLK0_1,
       ioclk1         		=> IOCLK1_1,
-      clkdiv         		=> div_clk_bufg_0,
+      clkdiv         		=> div_clk_bufg_1,
       serdesstrobe   		=> serdesstrobe_1,
       data_8bit_out         => adc_data_b_8bit(i),
-	  iodelay_calib			=> iodelay_calib,
+	  cal        			=> iodelay_calib,
 	  iodelay_ce			=> iodelay_ce,
 	  iodelay_inc			=> vio_calib_vector(1),
-      iodalay_clk           => CLK_100MHz,
+      clk                   => div_clk_bufg_1,
 	  bitslip				=> bitslip,
+      iodelay_busy                  => open,
 	  rst					=> '0'
     );
 end generate;
@@ -262,9 +296,9 @@ bitslip_process :
 
 
 calib_process :
-    process(CLK_100MHz)
+    process(div_clk_bufg_0)
     begin
-      if rising_edge(CLK_100MHz) then
+      if rising_edge(div_clk_bufg_0) then
         calib_sync_vect(3 downto 1) <= calib_sync_vect( 2 downto 0);
         calib_sync_vect(0) <= vio_calib_vector(0);
         iodelay_calib <= (not calib_sync_vect(3)) and calib_sync_vect(2);
@@ -272,9 +306,9 @@ calib_process :
     end process;
     
 ce_process :
-    process(CLK_100MHz)
+    process(div_clk_bufg_0)
     begin
-      if rising_edge(CLK_100MHz) then
+      if rising_edge(div_clk_bufg_0) then
         ce_sync_vect(3 downto 1) <= ce_sync_vect( 2 downto 0);
         ce_sync_vect(0) <= vio_calib_vector(2);
         iodelay_ce <= (not ce_sync_vect(3)) and ce_sync_vect(2);
@@ -299,7 +333,7 @@ icon_inst : ENTITY chipscope_icon_v1_06_a_0
 vio_calib_inst :ENTITY chipscope_vio
   port map(
     CONTROL		=> vio_calib_control,
-    CLK			=> CLK_100MHz,
+    CLK			=> div_clk_bufg_0,
     SYNC_IN		=> vio_calib_vector,
     SYNC_OUT	=> vio_calib_vector
     );

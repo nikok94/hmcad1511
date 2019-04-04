@@ -32,30 +32,109 @@ library UNISIM;
 use UNISIM.VComponents.all;
 
 entity lvds_deserializer is
+    generic (
+        C_IDELAY_VALUE      : integer := 16;
+        C_DUAL_PATTERN      : std_logic_vector(16 downto 0):= x"55AA";
+    );
     Port ( 
       data_in_p             : in std_logic;
       data_in_n             : in std_logic;
-      ioclk0          		: in std_logic;
-      ioclk1          		: in std_logic;
-      clkdiv         		: in std_logic;
-      serdesstrobe   		: in std_logic;
+      ioclk0                : in std_logic;
+      ioclk1                : in std_logic;
+      clkdiv                : in std_logic;
+      serdesstrobe          : in std_logic;
+      
+      bitslip               : in std_logic;
       data_8bit_out         : out std_logic_vector(7 downto 0);
-	  iodelay_calib			: in std_logic;
+	  cal			        : in std_logic;
 	  iodelay_ce			: in std_logic;
 	  iodelay_inc			: in std_logic;
-	  iodalay_clk			: in std_logic;
-	  bitslip				: in std_logic;
+	  clk			        : in std_logic;
+      iodelay_busy                  : out std_logic;
+
 	  rst					: in std_logic
     );
 end lvds_deserializer;
 
 architecture Behavioral of lvds_deserializer is
+    type calib_state_machine is (idle, dalay_rst, calib, ready, calib_done);
+    signal state, next_state : calib_state_machine;
     signal serial_data_in               : std_logic;
     signal serial_data_in_delay_m       : std_logic;
     signal serial_data_in_delay_s       : std_logic;
-    signal mastr_iserdes_shifth_out     : std_logic;
+    signal slave_iserdes_shifth_out     : std_logic;
+    signal master_iserdes_shifth_out    : std_logic;    
+    signal master_dly_busy              : std_logic;
+    signal slave_dly_busy               : std_logic;
+    signal busy                         : std_logic;
+    signal iodelay_rst                  : std_logic;
+    signal iodelay_cal                  : std_logic;
+    signal calib_ok                     : std_logic;
 
 begin
+
+busy <= master_dly_busy or slave_dly_busy;
+
+iodelay_busy <= busy;
+
+sync_proc :
+    process(clk)
+    begin
+      if rising_edge(clk) then
+        if rst = '1' then 
+          state <= idle;
+        else
+          state <= next_state;
+        end if;
+      end if;
+    end process;
+    
+data_proc:
+    process(state)
+    begin
+    iodelay_rst <= '0';
+    iodelay_cal <= '0';
+      case state is
+        when idle =>
+          calib_ok <= '0';
+        when calib =>
+          iodelay_cal <= '1';
+        when dalay_rst =>
+          calib_ok <= '1';
+          iodelay_rst <= '1';
+        when others =>
+      end case;
+    end process;
+
+next_state_machine_process:
+    process(state, cal, calib_ok, busy)
+    begin
+      next_state <= state;
+        case state is
+          when idle =>
+            if cal = '1' then
+              next_state <= calib;
+            end if;
+          when calib => 
+            next_state <= ready;
+          when ready =>
+            if (busy = '0') then
+              if (calib_ok = '1') then
+                next_state <= calib_done;
+              else
+                next_state <= dalay_rst;
+              end if;
+            end if;
+          when dalay_rst => 
+            next_state <= calib_done;
+          when calib_done => 
+            if cal = '1' then
+              next_state <= calib;
+            end if;
+          when others =>
+            next_state <= idle;
+        end case;
+    end process;
 
 IBUFDS_inst : IBUFDS
    generic map (
@@ -77,52 +156,52 @@ MASTER_IODELAY2_INST : IODELAY2
       IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
       IDELAY_TYPE => "VARIABLE_FROM_ZERO",           -- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
                                           -- or "DIFF_PHASE_DETECTOR" 
-      IDELAY_VALUE => 0,                  -- Amount of taps for fixed input delay (0-255)
+      IDELAY_VALUE => 16,                  -- Amount of taps for fixed input delay (0-255)
       ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
       SERDES_MODE => "MASTER",              -- "NONE", "MASTER" or "SLAVE" 
       SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
    )
    port map (
-      BUSY => open,         -- 1-bit output: Busy output after CAL
+      BUSY => master_dly_busy,         -- 1-bit output: Busy output after CAL
       DATAOUT => serial_data_in_delay_m,   -- 1-bit output: Delayed data output to ISERDES/input register
       DATAOUT2 => open, -- 1-bit output: Delayed data output to general FPGA fabric
       DOUT => open,         -- 1-bit output: Delayed data output
       TOUT => open,         -- 1-bit output: Delayed 3-state output
-      CAL => iodelay_calib,           -- 1-bit input: Initiate calibration input
+      CAL => iodelay_cal,           -- 1-bit input: Initiate calibration input
       CE => iodelay_ce,             -- 1-bit input: Enable INC input
-      CLK => iodalay_clk,           -- 1-bit input: Clock input
+      CLK => clk,           -- 1-bit input: Clock input
       IDATAIN => serial_data_in,   -- 1-bit input: Data input (connect to top-level port or I/O buffer)
       INC => iodelay_inc,           -- 1-bit input: Increment / decrement input
       IOCLK0 => ioclk0,     -- 1-bit input: Input from the I/O clock network
       IOCLK1 => ioclk1,     -- 1-bit input: Input from the I/O clock network
       ODATAIN => '0',   -- 1-bit input: Output data input from output register or OSERDES2.
-      RST => rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
-      T => '0'                -- 1-bit input: 3-state input signal
+      RST => iodelay_rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
+      T => '1'                -- 1-bit input: 3-state input signal
    );
 
 SLAVE_IODELAY2_INST : IODELAY2
    generic map (
       COUNTER_WRAPAROUND => "WRAPAROUND", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
       DATA_RATE => "DDR",                 -- "SDR" or "DDR" 
-      DELAY_SRC => "IDATAIN",                  -- "IO", "ODATAIN" or "IDATAIN" 
+      DELAY_SRC => "IDATAIN",             -- "IO", "ODATAIN" or "IDATAIN" 
       IDELAY2_VALUE => 0,                 -- Delay value when IDELAY_MODE="PCI" (0-255)
       IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
-      IDELAY_TYPE => "VARIABLE_FROM_ZERO",           -- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
+      IDELAY_TYPE => "VARIABLE_FROM_ZERO",-- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
                                           -- or "DIFF_PHASE_DETECTOR" 
-      IDELAY_VALUE => 0,                  -- Amount of taps for fixed input delay (0-255)
+      IDELAY_VALUE => 16,                  -- Amount of taps for fixed input delay (0-255)
       ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
       SERDES_MODE => "SLAVE",              -- "NONE", "MASTER" or "SLAVE" 
       SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
    )
    port map (
-      BUSY => open,         -- 1-bit output: Busy output after CAL
+      BUSY => slave_dly_busy,         -- 1-bit output: Busy output after CAL
       DATAOUT => serial_data_in_delay_s ,   -- 1-bit output: Delayed data output to ISERDES/input register
       DATAOUT2 => open, -- 1-bit output: Delayed data output to general FPGA fabric
       DOUT => open,         -- 1-bit output: Delayed data output
       TOUT => open,         -- 1-bit output: Delayed 3-state output
-      CAL => iodelay_calib,           -- 1-bit input: Initiate calibration input
+      CAL => iodelay_cal,           -- 1-bit input: Initiate calibration input
       CE => iodelay_ce,             -- 1-bit input: Enable INC input
-      CLK => iodalay_clk,           -- 1-bit input: Clock input
+      CLK => clk,           -- 1-bit input: Clock input
       IDATAIN => serial_data_in,   -- 1-bit input: Data input (connect to top-level port or I/O buffer)
       INC => iodelay_inc,           -- 1-bit input: Increment / decrement input
       IOCLK0 => ioclk0,     -- 1-bit input: Input from the I/O clock network
@@ -134,10 +213,10 @@ SLAVE_IODELAY2_INST : IODELAY2
 
 MASTER_ISERDES2 : ISERDES2
    generic map (
-      BITSLIP_ENABLE => FALSE,        -- Enable Bitslip Functionality (TRUE/FALSE)
+      BITSLIP_ENABLE => true,        -- Enable Bitslip Functionality (TRUE/FALSE)
       DATA_RATE => "DDR",             -- Data-rate ("SDR" or "DDR")
       DATA_WIDTH => 8,                -- Parallel data width selection (2-8)
-      INTERFACE_TYPE => "RETIMED", -- "NETWORKING", "NETWORKING_PIPELINED" or "RETIMED" 
+      INTERFACE_TYPE => "NETWORKING_PIPELINED", -- "NETWORKING", "NETWORKING_PIPELINED" or "RETIMED" 
       SERDES_MODE => "NONE"           -- "NONE", "MASTER" or "SLAVE" 
    )
    port map (
@@ -147,11 +226,11 @@ MASTER_ISERDES2 : ISERDES2
       FABRICOUT => open, -- 1-bit output: Unsynchrnonized data output
       INCDEC => open,       -- 1-bit output: Phase detector output
       -- Q1 - Q4: 1-bit (each) output: Registered outputs to FPGA logic
-      Q1 => data_8bit_out(4),
-      Q2 => data_8bit_out(5),
-      Q3 => data_8bit_out(6),
-      Q4 => data_8bit_out(7),
-      SHIFTOUT => mastr_iserdes_shifth_out,   -- 1-bit output: Cascade output signal for master/slave I/O
+      Q1 => data_8bit_out(3),
+      Q2 => data_8bit_out(2),
+      Q3 => data_8bit_out(1),
+      Q4 => data_8bit_out(0),
+      SHIFTOUT => master_iserdes_shifth_out,   -- 1-bit output: Cascade output signal for master/slave I/O
       VALID => open,         -- 1-bit output: Output status of the phase detector
       BITSLIP => BITSLIP,     -- 1-bit input: Bitslip enable input
       CE0 => '1',             -- 1-bit input: Clock enable input
@@ -160,16 +239,16 @@ MASTER_ISERDES2 : ISERDES2
       CLKDIV => clkdiv,       -- 1-bit input: FPGA logic domain clock input
       D => serial_data_in_delay_m,                 -- 1-bit input: Input data
       IOCE => serdesstrobe,           -- 1-bit input: Data strobe input
-      RST => rst,             -- 1-bit input: Asynchronous reset input
-      SHIFTIN => '0'      -- 1-bit input: Cascade input signal for master/slave I/O
+      RST => rst,                               -- 1-bit input: Asynchronous reset input
+      SHIFTIN => slave_iserdes_shifth_out       -- 1-bit input: Cascade input signal for master/slave I/O
    );
 
 SLAVE_ISERDES2 : ISERDES2
    generic map (
-      BITSLIP_ENABLE => FALSE,        -- Enable Bitslip Functionality (TRUE/FALSE)
+      BITSLIP_ENABLE => false,        -- Enable Bitslip Functionality (TRUE/FALSE)
       DATA_RATE => "DDR",             -- Data-rate ("SDR" or "DDR")
       DATA_WIDTH => 8,                -- Parallel data width selection (2-8)
-      INTERFACE_TYPE => "RETIMED", -- "NETWORKING", "NETWORKING_PIPELINED" or "RETIMED" 
+      INTERFACE_TYPE => "NETWORKING_PIPELINED", -- "NETWORKING", "NETWORKING_PIPELINED" or "RETIMED" 
       SERDES_MODE => "SLAVE"           -- "NONE", "MASTER" or "SLAVE" 
    )
    port map (
@@ -179,11 +258,11 @@ SLAVE_ISERDES2 : ISERDES2
       FABRICOUT => open, -- 1-bit output: Unsynchrnonized data output
       INCDEC => open,       -- 1-bit output: Phase detector output
       -- Q1 - Q4: 1-bit (each) output: Registered outputs to FPGA logic
-      Q1 => data_8bit_out(0),
-      Q2 => data_8bit_out(1),
-      Q3 => data_8bit_out(2),
-      Q4 => data_8bit_out(3),
-      SHIFTOUT => open,   -- 1-bit output: Cascade output signal for master/slave I/O
+      Q1 => data_8bit_out(7),
+      Q2 => data_8bit_out(6),
+      Q3 => data_8bit_out(5),
+      Q4 => data_8bit_out(4),
+      SHIFTOUT => slave_iserdes_shifth_out,   -- 1-bit output: Cascade output signal for master/slave I/O
       VALID => open,         -- 1-bit output: Output status of the phase detector
       BITSLIP => BITSLIP,     -- 1-bit input: Bitslip enable input
       CE0 => '1',             -- 1-bit input: Clock enable input
@@ -193,7 +272,7 @@ SLAVE_ISERDES2 : ISERDES2
       D => serial_data_in_delay_s,                 -- 1-bit input: Input data
       IOCE => serdesstrobe,           -- 1-bit input: Data strobe input
       RST => rst,             -- 1-bit input: Asynchronous reset input
-      SHIFTIN => mastr_iserdes_shifth_out      -- 1-bit input: Cascade input signal for master/slave I/O
+      SHIFTIN => master_iserdes_shifth_out      -- 1-bit input: Cascade input signal for master/slave I/O
    );
 
 
