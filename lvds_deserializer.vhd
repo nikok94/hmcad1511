@@ -221,7 +221,7 @@ MASTER_IODELAY2_INST : IODELAY2
       IOCLK0 => '0',     -- 1-bit input: Input from the I/O clock network
       IOCLK1 => '0',     -- 1-bit input: Input from the I/O clock network
       ODATAIN => '0',   -- 1-bit input: Output data input from output register or OSERDES2.
-      RST => '0',           -- 1-bit input: Reset to zero or 1/2 of total delay period
+      RST => rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
       T => '1'                -- 1-bit input: 3-state input signal
    );
 
