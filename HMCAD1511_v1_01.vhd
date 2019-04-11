@@ -27,6 +27,10 @@ library work;
 use work.lvds_deserializer;
 use work.high_speed_clock_to_serdes;
 
+--use work.chipscope_vio_3;
+--use work.ila;
+--use work.chipscope_icon;
+
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
 --use IEEE.NUMERIC_STD.ALL;
@@ -39,7 +43,8 @@ use UNISIM.VComponents.all;
 entity HMCAD1511_v1_01 is
     generic (
       C_IDELAY_VALUE      : integer := 16;
-      C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA"
+      C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA";
+      C_IODELAY_FIXED     : boolean := FALSE
     );
     Port (
       LCLKp         : in std_logic;
@@ -92,6 +97,18 @@ architecture Behavioral of HMCAD1511_v1_01 is
     signal data_out_valid_d2                : std_logic;
     signal data_out_valid_d3                : std_logic;
     signal cal_done_sync                    : std_logic;
+    signal iodelay_clk                      : std_logic;
+    signal iodelay_inc                      : std_logic;
+    signal iodelay_ce                       : std_logic;
+    signal iodelay_cal                      : std_logic;
+    signal iodelay_rst                      : std_logic;
+    signal iodelay_calib                    : std_logic;
+    signal vio_calib_control                : std_logic_vector(35 downto 0);
+    signal ila_control                      : std_logic_vector(35 downto 0);
+    signal vio_calib_vector                 : std_logic_vector(3 downto 0);
+    signal vio_calib_vector_d               : std_logic_vector(3 downto 0);
+    signal data_out                         : std_logic_vector(66 downto 0);
+    
 
 begin
 DIVCLK_OUT <= div_clk_bufg_1;
@@ -178,6 +195,7 @@ high_speed_clock_to_serdes_1 : entity high_speed_clock_to_serdes
     );
 
 high_speed_clock_to_serdes_0 : entity high_speed_clock_to_serdes
+
     Port map( 
         in_clk_from_bufg    => lclk_ibufg_out,
         div_clk_bufg        => div_clk_bufg_1,
@@ -187,6 +205,11 @@ high_speed_clock_to_serdes_0 : entity high_speed_clock_to_serdes
     );
 adc_deserializer_gen1 : for i in 0 to 1 generate
 lvds_deserializer_a_inst: entity lvds_deserializer
+    generic map(
+      C_IDELAY_VALUE        => C_IDELAY_VALUE,
+      C_DUAL_PATTERN        => C_DUAL_PATTERN,
+      C_IODELAY_FIXED       => C_IODELAY_FIXED
+    )
     Port map( 
       data_in_p             => DxXAp(i),
       data_in_n             => DxXAn(i),
@@ -195,6 +218,13 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       clkdiv         		=> div_clk_bufg_1,
       serdesstrobe   		=> serdesstrobe_0,
       
+      iodelay_clk           => iodelay_clk,
+      iodelay_inc           => iodelay_inc,
+      iodelay_ce            => iodelay_ce ,
+      iodelay_cal           => iodelay_cal,
+      iodelay_rst           => iodelay_rst,
+      
+      
       data_8bit_out         => adc_data_a_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i),
@@ -202,6 +232,11 @@ lvds_deserializer_a_inst: entity lvds_deserializer
     );
 
 lvds_deserializer_b_inst: entity lvds_deserializer
+    generic map(
+      C_IDELAY_VALUE        => C_IDELAY_VALUE,
+      C_DUAL_PATTERN        => C_DUAL_PATTERN,
+      C_IODELAY_FIXED       => C_IODELAY_FIXED
+    )
     Port map( 
       data_in_p             => DxXBp(i),
       data_in_n             => DxXBn(i),
@@ -209,6 +244,13 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       ioclk1         		=> IOCLK1_0,
       clkdiv         		=> div_clk_bufg_1,
       serdesstrobe   		=> serdesstrobe_0,
+      
+      iodelay_clk           => iodelay_clk,
+      iodelay_inc           => iodelay_inc,
+      iodelay_ce            => iodelay_ce ,
+      iodelay_cal           => iodelay_cal,
+      iodelay_rst           => iodelay_rst,
+      
       data_8bit_out         => adc_data_b_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
@@ -218,6 +260,11 @@ end generate;
 
 adc_deserializer_gen2 : for i in 2 to 3 generate
 lvds_deserializer_a_inst: entity lvds_deserializer
+    generic map(
+      C_IDELAY_VALUE        => C_IDELAY_VALUE,
+      C_DUAL_PATTERN        => C_DUAL_PATTERN,
+      C_IODELAY_FIXED       => C_IODELAY_FIXED
+    )
     Port map( 
       data_in_p             => DxXAp(i),
       data_in_n             => DxXAn(i),
@@ -225,6 +272,13 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       ioclk1        		=> IOCLK1_1,
       clkdiv        		=> div_clk_bufg_1,
       serdesstrobe  		=> serdesstrobe_1,
+      
+      iodelay_clk           => iodelay_clk,
+      iodelay_inc           => iodelay_inc,
+      iodelay_ce            => iodelay_ce ,
+      iodelay_cal           => iodelay_cal,
+      iodelay_rst           => iodelay_rst,
+      
       data_8bit_out         => adc_data_a_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i),
@@ -232,6 +286,11 @@ lvds_deserializer_a_inst: entity lvds_deserializer
     );
 
 lvds_deserializer_b_inst: entity lvds_deserializer
+    generic map(
+       C_IDELAY_VALUE        => C_IDELAY_VALUE,
+       C_DUAL_PATTERN        => C_DUAL_PATTERN,
+       C_IODELAY_FIXED       => C_IODELAY_FIXED
+    )
     Port map( 
       data_in_p             => DxXBp(i),
       data_in_n             => DxXBn(i),
@@ -239,6 +298,13 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       ioclk1         		=> IOCLK1_1,
       clkdiv         		=> div_clk_bufg_1,
       serdesstrobe   		=> serdesstrobe_1,
+      
+      iodelay_clk           => iodelay_clk,
+      iodelay_inc           => iodelay_inc,
+      iodelay_ce            => iodelay_ce ,
+      iodelay_cal           => iodelay_cal,
+      iodelay_rst           => iodelay_rst,
+      
       data_8bit_out         => adc_data_b_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
@@ -251,5 +317,52 @@ end generate;
                    adc_data_b_8bit(1) & adc_data_a_8bit(1) & 
                    adc_data_b_8bit(0) & adc_data_a_8bit(0);
     
+    
+--    iodelay_clk <= div_clk_bufg_1;
+--    iodelay_inc <= '1';
+--    
+--icon_inst : ENTITY chipscope_icon
+--  port map(
+--    CONTROL0    => vio_calib_control,
+--    CONTROL1    => ila_control
+--    );
+--
+--vio_calib_inst :ENTITY chipscope_vio_3
+--  port map(
+--    CONTROL		=> vio_calib_control,
+--    CLK			=> div_clk_bufg_1,
+--    SYNC_OUT	=> vio_calib_vector
+--    );
+--
+--ila_inst : ENTITY ila
+--  port map(
+--    CONTROL => ila_control,
+--    CLK     => div_clk_bufg_1,
+--    DATA    => DATA_out(63 downto 0),
+--    TRIG0(0)   => iodelay_calib
+--    );
+--
+--    DATA_out(7 downto 0)        <= adc_data_a_8bit(0);
+--    DATA_out(15 downto 8)       <= adc_data_b_8bit(0);
+--    DATA_out(23 downto 16)      <= adc_data_a_8bit(1);
+--    DATA_out(31 downto 24)      <= adc_data_b_8bit(1);
+--    DATA_out(39 downto 32)      <= adc_data_a_8bit(2);
+--    DATA_out(47 downto 40)      <= adc_data_b_8bit(2);
+--    DATA_out(55 downto 48)      <= adc_data_a_8bit(3);
+--    DATA_out(63 downto 56)      <= adc_data_b_8bit(3);
+--    DATA_out(66 downto 64)      <= "000";
+--
+--
+--
+--process(div_clk_bufg_1)
+--begin
+--  if rising_edge(div_clk_bufg_1) then
+--    vio_calib_vector_d <= vio_calib_vector;
+--    iodelay_calib<= (not vio_calib_vector_d(3)) and vio_calib_vector(3);
+--    iodelay_ce  <= (not vio_calib_vector_d(2)) and vio_calib_vector(2);
+--    iodelay_cal <= (not vio_calib_vector_d(1)) and vio_calib_vector(1);
+--    iodelay_rst <= (not vio_calib_vector_d(0)) and vio_calib_vector(0);
+--  end if;
+--end process;
 
 end Behavioral;

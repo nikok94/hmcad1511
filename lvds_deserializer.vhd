@@ -23,6 +23,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_unsigned.ALL;
 
+
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
 --use IEEE.NUMERIC_STD.ALL;
@@ -35,7 +36,8 @@ use UNISIM.VComponents.all;
 entity lvds_deserializer is
     generic (
         C_IDELAY_VALUE      : integer := 16;
-        C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA"
+        C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA";
+        C_IODELAY_FIXED     : boolean := true
     );
     Port ( 
       data_in_p             : in std_logic;
@@ -44,7 +46,13 @@ entity lvds_deserializer is
       ioclk1                : in std_logic;
       clkdiv                : in std_logic;
       serdesstrobe          : in std_logic;
-    
+      
+      iodelay_clk           : in std_logic;
+      iodelay_inc           : in std_logic;
+      iodelay_ce            : in std_logic;
+      iodelay_cal           : in std_logic;
+      iodelay_rst           : in std_logic;
+      
       start_calib           : in std_logic;
       data_8bit_out         : out std_logic_vector(7 downto 0);
       calib_busy            : out std_logic;
@@ -192,6 +200,9 @@ IBUFDS_inst : IBUFDS
       I => data_in_p,  -- Diff_p buffer input (connect directly to top-level port)
       IB => data_in_n -- Diff_n buffer input (connect directly to top-level port)
    );
+   
+
+IODELAY_FIXED_generate : if C_IODELAY_FIXED = TRUE generate
 
 MASTER_IODELAY2_INST : IODELAY2
    generic map (
@@ -202,7 +213,7 @@ MASTER_IODELAY2_INST : IODELAY2
       IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
       IDELAY_TYPE => "FIXED",           -- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
                                           -- or "DIFF_PHASE_DETECTOR" 
-      IDELAY_VALUE => 16,                  -- Amount of taps for fixed input delay (0-255)
+      IDELAY_VALUE => C_IDELAY_VALUE,                  -- Amount of taps for fixed input delay (0-255)
       ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
       SERDES_MODE => "MASTER",              -- "NONE", "MASTER" or "SLAVE" 
       SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
@@ -234,7 +245,7 @@ SLAVE_IODELAY2_INST : IODELAY2
       IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
       IDELAY_TYPE => "FIXED",-- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
                                           -- or "DIFF_PHASE_DETECTOR" 
-      IDELAY_VALUE => 16,                  -- Amount of taps for fixed input delay (0-255)
+      IDELAY_VALUE => C_IDELAY_VALUE,                  -- Amount of taps for fixed input delay (0-255)
       ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
       SERDES_MODE => "SLAVE",              -- "NONE", "MASTER" or "SLAVE" 
       SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
@@ -256,6 +267,77 @@ SLAVE_IODELAY2_INST : IODELAY2
       RST => rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
       T => '0'                -- 1-bit input: 3-state input signal
    );
+
+end generate;
+
+NOT_IODELAY_FIXED_generate : if C_IODELAY_FIXED /= TRUE generate
+
+MASTER_IODELAY2_INST : IODELAY2
+   generic map (
+      COUNTER_WRAPAROUND => "WRAPAROUND", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
+      DATA_RATE => "DDR",                 -- "SDR" or "DDR" 
+      DELAY_SRC => "IDATAIN",                  -- "IO", "ODATAIN" or "IDATAIN" 
+      IDELAY2_VALUE => 0,                 -- Delay value when IDELAY_MODE="PCI" (0-255)
+      IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
+      IDELAY_TYPE => "VARIABLE_FROM_ZERO",           -- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
+                                          -- or "DIFF_PHASE_DETECTOR" 
+      IDELAY_VALUE => 0,                  -- Amount of taps for fixed input delay (0-255)
+      ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
+      SERDES_MODE => "MASTER",              -- "NONE", "MASTER" or "SLAVE" 
+      SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
+   )
+   port map (
+      BUSY => master_dly_busy,         -- 1-bit output: Busy output after CAL
+      DATAOUT => serial_data_in_delay_m,   -- 1-bit output: Delayed data output to ISERDES/input register
+      DATAOUT2 => open, -- 1-bit output: Delayed data output to general FPGA fabric
+      DOUT => open,         -- 1-bit output: Delayed data output
+      TOUT => open,         -- 1-bit output: Delayed 3-state output
+      CAL => iodelay_cal,           -- 1-bit input: Initiate calibration input
+      CE => iodelay_ce,             -- 1-bit input: Enable INC input
+      CLK => iodelay_clk,           -- 1-bit input: Clock input
+      IDATAIN => serial_data_in,   -- 1-bit input: Data input (connect to top-level port or I/O buffer)
+      INC => iodelay_inc,           -- 1-bit input: Increment / decrement input
+      IOCLK0 => ioclk0,     -- 1-bit input: Input from the I/O clock network
+      IOCLK1 => ioclk1,     -- 1-bit input: Input from the I/O clock network
+      ODATAIN => '0',   -- 1-bit input: Output data input from output register or OSERDES2.
+      RST => iodelay_rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
+      T => '1'                -- 1-bit input: 3-state input signal
+   );
+
+SLAVE_IODELAY2_INST : IODELAY2
+   generic map (
+      COUNTER_WRAPAROUND => "WRAPAROUND", -- "STAY_AT_LIMIT" or "WRAPAROUND" 
+      DATA_RATE => "DDR",                 -- "SDR" or "DDR" 
+      DELAY_SRC => "IDATAIN",             -- "IO", "ODATAIN" or "IDATAIN" 
+      IDELAY2_VALUE => 0,                 -- Delay value when IDELAY_MODE="PCI" (0-255)
+      IDELAY_MODE => "NORMAL",            -- "NORMAL" or "PCI" 
+      IDELAY_TYPE => "VARIABLE_FROM_ZERO",-- "FIXED", "DEFAULT", "VARIABLE_FROM_ZERO", "VARIABLE_FROM_HALF_MAX" 
+                                          -- or "DIFF_PHASE_DETECTOR" 
+      IDELAY_VALUE => 0,                  -- Amount of taps for fixed input delay (0-255)
+      ODELAY_VALUE => 0,                  -- Amount of taps fixed output delay (0-255)
+      SERDES_MODE => "SLAVE",              -- "NONE", "MASTER" or "SLAVE" 
+      SIM_TAPDELAY_VALUE => 75            -- Per tap delay used for simulation in ps
+   )
+   port map (
+      BUSY => slave_dly_busy,         -- 1-bit output: Busy output after CAL
+      DATAOUT => serial_data_in_delay_s ,   -- 1-bit output: Delayed data output to ISERDES/input register
+      DATAOUT2 => open, -- 1-bit output: Delayed data output to general FPGA fabric
+      DOUT => open,         -- 1-bit output: Delayed data output
+      TOUT => open,         -- 1-bit output: Delayed 3-state output
+      CAL => iodelay_cal,           -- 1-bit input: Initiate calibration input
+      CE => iodelay_ce,             -- 1-bit input: Enable INC input
+      CLK => iodelay_clk,           -- 1-bit input: Clock input
+      IDATAIN => serial_data_in,   -- 1-bit input: Data input (connect to top-level port or I/O buffer)
+      INC => iodelay_inc,           -- 1-bit input: Increment / decrement input
+      IOCLK0 => ioclk0,     -- 1-bit input: Input from the I/O clock network
+      IOCLK1 => ioclk1,     -- 1-bit input: Input from the I/O clock network
+      ODATAIN => '0',   -- 1-bit input: Output data input from output register or OSERDES2.
+      RST => iodelay_rst,           -- 1-bit input: Reset to zero or 1/2 of total delay period
+      T => '1'                -- 1-bit input: 3-state input signal
+   );
+
+end generate;
+
 
 MASTER_ISERDES2 : ISERDES2
    generic map (
