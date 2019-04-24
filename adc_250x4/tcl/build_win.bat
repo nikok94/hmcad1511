@@ -1,0 +1,1 @@
+planAhead -mode tcl -source ./build_project.tcl

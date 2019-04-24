@@ -1,0 +1,107 @@
+NET "m_strm_ready" KEEP = "TRUE";
+NET "trigger_start" KEEP = "TRUE";
+NET "wr_req_vec[0]" KEEP = "TRUE";
+#NET "in_clk_20MHz" LOC = P56;
+#NET "in_clk_20MHz" PERIOD = 20 MHz HIGH 50 %;
+
+#NET "adc_fclk_p" LOC = P124 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
+#NET "adc_fclk_n" LOC = P123 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
+
+NET "adc_lck_p" LOC = P127;
+NET "adc_lck_p" IOSTANDARD = LVDS_25;
+NET "adc_lck_p" DIFF_TERM = "TRUE";
+NET "adc_lck_n" LOC = P126;
+NET "adc_lck_n" IOSTANDARD = LVDS_25;
+NET "adc_lck_n" DIFF_TERM = "TRUE";
+
+NET "adc_data_receiver/high_speed_clock_to_serdes_0/div_clk" TNM_NET = "lck_div8";
+TIMESPEC TS_lck_div8 = PERIOD "lck_div8" 8 ns HIGH 50 %;
+
+NET "adc_dx_a_p[0]" LOC = P142;
+NET "adc_dx_a_p[0]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_p[0]" DIFF_TERM = "TRUE";
+NET "adc_dx_a_n[0]" LOC = P141;
+NET "adc_dx_a_n[0]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_n[0]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_b_p[0]" LOC = P140;
+NET "adc_dx_b_p[0]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_p[0]" DIFF_TERM = "TRUE";
+NET "adc_dx_b_n[0]" LOC = P139;
+NET "adc_dx_b_n[0]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_n[0]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_a_p[1]" LOC = P138;
+NET "adc_dx_a_p[1]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_p[1]" DIFF_TERM = "TRUE";
+NET "adc_dx_a_n[1]" LOC = P137;
+NET "adc_dx_a_n[1]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_n[1]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_b_p[1]" LOC = P134;
+NET "adc_dx_b_p[1]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_p[1]" DIFF_TERM = "TRUE";
+NET "adc_dx_b_n[1]" LOC = P133;
+NET "adc_dx_b_n[1]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_n[1]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_a_p[2]" LOC = P119;
+NET "adc_dx_a_p[2]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_p[2]" DIFF_TERM = "TRUE";
+NET "adc_dx_a_n[2]" LOC = P118;
+NET "adc_dx_a_n[2]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_n[2]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_b_p[2]" LOC = P117;
+NET "adc_dx_b_p[2]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_p[2]" DIFF_TERM = "TRUE";
+NET "adc_dx_b_n[2]" LOC = P116;
+NET "adc_dx_b_n[2]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_n[2]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_a_p[3]" LOC = P115;
+NET "adc_dx_a_p[3]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_p[3]" DIFF_TERM = "TRUE";
+NET "adc_dx_a_n[3]" LOC = P114;
+NET "adc_dx_a_n[3]" IOSTANDARD = LVDS_25;
+NET "adc_dx_a_n[3]" DIFF_TERM = "TRUE";
+
+NET "adc_dx_b_p[3]" LOC = P112;
+NET "adc_dx_b_p[3]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_p[3]" DIFF_TERM = "TRUE";
+NET "adc_dx_b_n[3]" LOC = P111;
+NET "adc_dx_b_n[3]" IOSTANDARD = LVDS_25;
+NET "adc_dx_b_n[3]" DIFF_TERM = "TRUE";
+
+NET "fast_adc_data_valid" LOC = P6;
+NET "fast_adc_data_valid" IOSTANDARD = LVCMOS33;
+
+NET "fast_adc_calib_done" LOC = P87;
+NET "fast_adc_calib_done" IOSTANDARD = LVCMOS33;
+
+#NET "low_adc_data_valid" LOC = P88 | IOSTANDARD = LVCMOS33;
+
+NET "spifi_cs" LOC = P8;
+NET "spifi_cs" IOSTANDARD = LVCMOS33;
+NET "spifi_sck" LOC = P14;
+NET "spifi_sck" IOSTANDARD = LVCMOS33;
+NET "spifi_miso" LOC = P10;
+NET "spifi_miso" IOSTANDARD = LVCMOS33;
+NET "spifi_mosi" LOC = P9;
+NET "spifi_mosi" IOSTANDARD = LVCMOS33;
+NET "spifi_sio2" LOC = P11;
+NET "spifi_sio2" IOSTANDARD = LVCMOS33;
+NET "spifi_sio3" LOC = P12;
+NET "spifi_sio3" IOSTANDARD = LVCMOS33;
+
+NET "fpga_mosi" LOC = P21;
+NET "fpga_mosi" IOSTANDARD = LVCMOS33;
+NET "fpga_miso" LOC = P17;
+NET "fpga_miso" IOSTANDARD = LVCMOS33;
+NET "fpga_cs" LOC = P16;
+NET "fpga_cs" IOSTANDARD = LVCMOS33;
+NET "fpga_sck" LOC = P15;
+NET "fpga_sck" IOSTANDARD = LVCMOS33;
+
+NET "ext_trig" LOC = P93;
+NET "ext_trig" IOSTANDARD = LVCMOS33;

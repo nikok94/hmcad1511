@@ -42,25 +42,25 @@ use UNISIM.VComponents.all;
 
 entity HMCAD1511_v1_01 is
     generic (
-      C_IDELAY_VALUE      : integer := 16;
-      C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA";
-      C_IODELAY_FIXED     : boolean := FALSE
+      C_IDELAY_VALUE        : integer := 16;
+      C_IODELAY_FIXED       : boolean := FALSE
     );
     Port (
-      LCLKp         : in std_logic;
-      LCLKn         : in std_logic;
-      DxXAp         : in std_logic_vector(3 downto 0);
-      DxXAn         : in std_logic_vector(3 downto 0);
-      DxXBp         : in std_logic_vector(3 downto 0);
-      DxXBn         : in std_logic_vector(3 downto 0);
-      CAL           : in std_logic;
-      CAL_DONE      : out std_logic;
-      CLK           : in std_logic;
-      ARESET        : in std_logic;
+      LCLKp                 : in std_logic;
+      LCLKn                 : in std_logic;
+      DxXAp                 : in std_logic_vector(3 downto 0);
+      DxXAn                 : in std_logic_vector(3 downto 0);
+      DxXBp                 : in std_logic_vector(3 downto 0);
+      DxXBn                 : in std_logic_vector(3 downto 0);
+      CAL_DUAL_PATTERN      : in std_logic_vector(15 downto 0);
+      CAL                   : in std_logic;
+      CAL_DONE              : out std_logic;
+      CLK                   : in std_logic;
+      ARESET                : in std_logic;
 
-      M_STRM_VALID  : out std_logic;
-      M_STRM_DATA   : out std_logic_vector(63 downto 0);
-      DIVCLK_OUT    : out std_logic
+      M_STRM_VALID          : out std_logic;
+      M_STRM_DATA           : out std_logic_vector(63 downto 0);
+      DIVCLK_OUT            : out std_logic
     );
 end HMCAD1511_v1_01;
 
@@ -207,7 +207,6 @@ adc_deserializer_gen1 : for i in 0 to 1 generate
 lvds_deserializer_a_inst: entity lvds_deserializer
     generic map(
       C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_DUAL_PATTERN        => C_DUAL_PATTERN,
       C_IODELAY_FIXED       => C_IODELAY_FIXED
     )
     Port map( 
@@ -224,7 +223,7 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       iodelay_cal           => iodelay_cal,
       iodelay_rst           => iodelay_rst,
       
-      
+      cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_a_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i),
@@ -234,7 +233,6 @@ lvds_deserializer_a_inst: entity lvds_deserializer
 lvds_deserializer_b_inst: entity lvds_deserializer
     generic map(
       C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_DUAL_PATTERN        => C_DUAL_PATTERN,
       C_IODELAY_FIXED       => C_IODELAY_FIXED
     )
     Port map( 
@@ -251,6 +249,7 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       iodelay_cal           => iodelay_cal,
       iodelay_rst           => iodelay_rst,
       
+      cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_b_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
@@ -262,7 +261,6 @@ adc_deserializer_gen2 : for i in 2 to 3 generate
 lvds_deserializer_a_inst: entity lvds_deserializer
     generic map(
       C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_DUAL_PATTERN        => C_DUAL_PATTERN,
       C_IODELAY_FIXED       => C_IODELAY_FIXED
     )
     Port map( 
@@ -279,6 +277,7 @@ lvds_deserializer_a_inst: entity lvds_deserializer
       iodelay_cal           => iodelay_cal,
       iodelay_rst           => iodelay_rst,
       
+      cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_a_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i),
@@ -288,7 +287,6 @@ lvds_deserializer_a_inst: entity lvds_deserializer
 lvds_deserializer_b_inst: entity lvds_deserializer
     generic map(
        C_IDELAY_VALUE        => C_IDELAY_VALUE,
-       C_DUAL_PATTERN        => C_DUAL_PATTERN,
        C_IODELAY_FIXED       => C_IODELAY_FIXED
     )
     Port map( 
@@ -305,6 +303,7 @@ lvds_deserializer_b_inst: entity lvds_deserializer
       iodelay_cal           => iodelay_cal,
       iodelay_rst           => iodelay_rst,
       
+      cal_dual_pattern      => cal_dual_pattern,
       data_8bit_out         => adc_data_b_8bit(i),
 	  start_calib           => cal_in_sync,
       calib_busy            => lvds_deserializers_busy_vec(2*i + 1),

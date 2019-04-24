@@ -36,7 +36,6 @@ use UNISIM.VComponents.all;
 entity lvds_deserializer is
     generic (
         C_IDELAY_VALUE      : integer := 16;
-        C_DUAL_PATTERN      : std_logic_vector(15 downto 0):= x"55AA";
         C_IODELAY_FIXED     : boolean := true
     );
     Port ( 
@@ -53,6 +52,7 @@ entity lvds_deserializer is
       iodelay_cal           : in std_logic;
       iodelay_rst           : in std_logic;
       
+      cal_dual_pattern      : in std_logic_vector(15 downto 0);
       start_calib           : in std_logic;
       data_8bit_out         : out std_logic_vector(7 downto 0);
       calib_busy            : out std_logic;
@@ -104,8 +104,8 @@ counter_data_rate_proc:
     end if;
   end process;
 
-calib_data_0_sts <= '1' when (calib_data_0 = C_DUAL_PATTERN(7 downto 0) or calib_data_0 = C_DUAL_PATTERN(15 downto 8)) else '0';
-calib_data_1_sts <= '1' when (calib_data_1 = C_DUAL_PATTERN(7 downto 0) or calib_data_1 = C_DUAL_PATTERN(15 downto 8)) else '0';
+calib_data_0_sts <= '1' when (calib_data_0 = CAL_DUAL_PATTERN(7 downto 0) or calib_data_0 = CAL_DUAL_PATTERN(15 downto 8)) else '0';
+calib_data_1_sts <= '1' when (calib_data_1 = CAL_DUAL_PATTERN(7 downto 0) or calib_data_1 = CAL_DUAL_PATTERN(15 downto 8)) else '0';
 
 calib_data_proc :
   process(clkdiv)

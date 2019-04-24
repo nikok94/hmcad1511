@@ -176,6 +176,7 @@ output_state_machine_proc :
         when send_word =>
           m_valid <= '1';
         when buff_state =>
+          m_valid <= '1';
         when others =>
       end case;
     end process;
