@@ -1,0 +1,8 @@
+*.jou
+*.log
+*.backup
+/**/edk/*
+!/**/edk/axi_subdesign.xmp
+!/**/edk/axi_subdesign.mhs
+/**/prj/*
+
