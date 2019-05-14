@@ -25,8 +25,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 library work;
 use work.QuadSpi_x4_8byte_tranceiver;
 use work.spi_byte_receiver;
---use work.ila_qspi;
---use work.icon_0;
+use work.chipscope_icon_qspi;
+use work.chipscope_ila_qspi;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -77,12 +77,14 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal data_8byte           : std_logic_vector(63 downto 0);
     signal start                : std_logic;
     signal quad_tr_ready        : std_logic;
+    signal quad_compleat        : std_logic;
     signal ready                : std_Logic;
     signal ila_control_0        : std_logic_vector(35 downto 0);
 
 begin
 
 s_strm_ready <= ready;
+compleat <= quad_compleat;
 
 MOSI_IOBUF_inst : IOBUF
    generic map (
@@ -188,7 +190,7 @@ state_data_proc:
     ready <= '0';
     spifi_tri_state <= '1';
     start <= '0';
-    compleat <= '0';
+    quad_compleat <= '0';
       case state is
         when idle =>
         when rd_start_byte =>
@@ -203,7 +205,7 @@ state_data_proc:
         when qspi_trans => 
           spifi_tri_state <= '0';
         when qspi_trans_compleat => 
-          compleat <= '1';
+          quad_compleat <= '1';
         when others =>
       end case;
   end process;
@@ -246,16 +248,16 @@ next_state_proc:
       end case;
   end process;
 
---ila_reg_inst : entity ila_qspi 
---  port map (
---    CONTROL     => ila_control_0,
---    CLK         => s_strm_clk,
---    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_tr_ready & start & data_8byte,
---    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i & miso_o & spifi_sck & spifi_cs & quad_tr_ready & start 
---    );
---icon_inst : ENTITY icon_0
---  port map (
---    CONTROL0 => ila_control_0
---    );
+ila_reg_inst : entity chipscope_ila_qspi 
+  port map (
+    CONTROL     => ila_control_0,
+    CLK         => s_strm_clk,
+    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid & s_strm_data,
+    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid
+    );
+icon_inst : ENTITY chipscope_icon_qspi
+  port map (
+    CONTROL0 => ila_control_0
+    );
 
 end Behavioral;

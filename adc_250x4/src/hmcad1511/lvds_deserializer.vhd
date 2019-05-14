@@ -354,10 +354,10 @@ MASTER_ISERDES2 : ISERDES2
       FABRICOUT => open, -- 1-bit output: Unsynchrnonized data output
       INCDEC => open,       -- 1-bit output: Phase detector output
       -- Q1 - Q4: 1-bit (each) output: Registered outputs to FPGA logic
-      Q1 => serdes_out_8bit(3),
-      Q2 => serdes_out_8bit(2),
-      Q3 => serdes_out_8bit(1),
-      Q4 => serdes_out_8bit(0),
+      Q1 => serdes_out_8bit(4),
+      Q2 => serdes_out_8bit(5),
+      Q3 => serdes_out_8bit(6),
+      Q4 => serdes_out_8bit(7),
       SHIFTOUT => master_iserdes_shifth_out,   -- 1-bit output: Cascade output signal for master/slave I/O
       VALID => open,         -- 1-bit output: Output status of the phase detector
       BITSLIP => bitslip,     -- 1-bit input: Bitslip enable input
@@ -386,10 +386,10 @@ SLAVE_ISERDES2 : ISERDES2
       FABRICOUT => open, -- 1-bit output: Unsynchrnonized data output
       INCDEC => open,       -- 1-bit output: Phase detector output
       -- Q1 - Q4: 1-bit (each) output: Registered outputs to FPGA logic
-      Q1 => serdes_out_8bit(7),
-      Q2 => serdes_out_8bit(6),
-      Q3 => serdes_out_8bit(5),
-      Q4 => serdes_out_8bit(4),
+      Q1 => serdes_out_8bit(0),
+      Q2 => serdes_out_8bit(1),
+      Q3 => serdes_out_8bit(2),
+      Q4 => serdes_out_8bit(3),
       SHIFTOUT => slave_iserdes_shifth_out,   -- 1-bit output: Cascade output signal for master/slave I/O
       VALID => open,         -- 1-bit output: Output status of the phase detector
       BITSLIP => bitslip,     -- 1-bit input: Bitslip enable input

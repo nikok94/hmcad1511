@@ -175,8 +175,6 @@ output_state_machine_proc :
           s_ready <= '1';
         when send_word =>
           m_valid <= '1';
-        when buff_state =>
-          m_valid <= '1';
         when others =>
       end case;
     end process;
@@ -193,22 +191,20 @@ next_state_machine_proc :
             next_state <= capture;
           end if;
         when capture =>
-          if wr_addr = addr_end_position then
-            next_state <= buff_state;
+          if (wr_addr = addr_end_position) then
+            next_state <= send_word;
           end if;
         when send_word =>
           if (m_strm_ready = '1') then
-            next_state <= rd_addr_edge;
+            next_state <= buff_state;
           end if;
         when rd_addr_edge => 
-          next_state <= buff_state;
+          next_state <= send_word;
         when buff_state =>
-          if (m_strm_ready = '1') then
             if (rd_addr = addr_end_position) then
               next_state <= edle;
             else 
-              next_state <= send_word;
-            end if;
+              next_state <= rd_addr_edge;
           end if;
         when others =>
           next_state <= edle;

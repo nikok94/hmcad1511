@@ -67,8 +67,24 @@ architecture Behavioral of trigger_capture is
     signal old_data         : std_logic_vector(c_data_width-1 downto 0);
     signal level_up_vect    : std_logic_vector(c_data_width/8 - 1 downto 0);
     signal level_down_vect  : std_logic_vector(c_data_width/8 - 1 downto 0);
+    signal capture_enable   : std_logic;
+    signal capture_start    : std_logic;
 
 begin
+
+trigger_start <= capture_start when capture_enable = '1' else '0';
+
+capture_enable_proc :
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if (rst = '1' or capture_start = '1') then 
+        capture_enable <= '0';
+      elsif (control_reg_wr_en = '1') then
+        capture_enable <= '1';
+      end if;
+    end if;
+  end process;
 
 control_reg_process :
   process(clk)
@@ -113,14 +129,14 @@ trigger_start_out_proc :
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        trigger_start <= '0';
+        capture_start <= '0';
       else
         case capture_mode is
-          when "00" => trigger_start <= control_start;
-          when "01" => trigger_start <= level_up_start;
-          when "10" => trigger_start <= level_down_start;
-          when "11" => trigger_start <= ext_start;
-          when others => trigger_start <= '0';
+          when "00" => capture_start <= control_start;
+          when "01" => capture_start <= level_up_start;
+          when "10" => capture_start <= level_down_start;
+          when "11" => capture_start <= ext_start;
+          when others => capture_start <= '0';
         end case;
       end if;
     end if;

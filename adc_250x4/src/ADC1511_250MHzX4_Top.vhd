@@ -116,7 +116,10 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal rst_vector                               : std_logic_vector(7 downto 0) := (others => '1');
     signal adc_data_valid                           : std_logic;
     
+    signal trigger_start_channel_2                  : std_logic;
+    signal trigger_start_channel_1                  : std_logic;
     signal trigger_start                            : std_logic;
+    signal channel_control                          : std_logic_vector(1 downto 0);
 
     signal m_strm_data                              : std_logic_vector(63 downto 0);
     signal m_strm_valid                             : std_logic;
@@ -154,12 +157,15 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal trig_position_reg                        : std_logic_vector(15 downto 0):= x"0800";
     signal control_reg                              : std_logic_vector(15 downto 0):= (others => '0');
     signal calib_pattern_reg                        : std_logic_vector(15 downto 0):= x"55AA";
-    signal wr_req_vec                               : std_logic_vector(4 downto 0);
+    signal wr_req_vec                               : std_logic_vector(5 downto 0);
     signal reg_address_int                          : integer;
     signal pll_lock                                 : std_logic;
     signal qspi_compleat                            : std_logic;
     signal infrst_rst_out                           : std_logic;
     signal control_reg_0_d                          : std_logic;
+    signal spifi_cs_d                               : std_logic;
+    signal spifi_cs_up                              : std_logic;
+    signal capture_module_rst                       : std_logic;
 
 begin
 -- модуль infrastructure_module использует поделенную тактовую частоту генерируемую АЦП 
@@ -222,30 +228,67 @@ capture_valid_proc :
     process(clk_125MHz)
     begin
       if rising_edge(clk_125MHz) then
-        if (rst = '1') or (qspi_compleat = '1') then
+        if (rst = '1') or (spifi_cs_up = '1') then
           fast_adc_data_valid <= '0';
         elsif m_strm_valid = '1' then
           fast_adc_data_valid <= '1';
         end if;
+        spifi_cs_d <= spifi_cs;
       end if;
     end process;
 
+spifi_cs_up <= spifi_cs and (not spifi_cs_d);
 
-trigger_capture_inst : entity trigger_capture
+trigger_capture_channel_1 : entity trigger_capture
     generic map(
-        c_data_width    => 64
+        c_data_width    => 32
     )
     Port map( 
       clk               => clk_125MHz,
       rst               => rst,
       control_reg       => trig_set_up_reg,
-      control_reg_wr_en => wr_req_vec(0),
+      control_reg_wr_en => wr_req_vec(5),
 
-      data              => m_stream_data,   -- входные значения данных от АЦП
+      data              => m_stream_data(31 downto 0),   -- входные значения данных от АЦП
       ext_trig          => ext_trig,        -- внешний триггер
       
-      trigger_start     => trigger_start    -- выходной сигнал управляет модулем захвата данных
+      trigger_start     => trigger_start_channel_1    -- выходной сигнал управляет модулем захвата данных
     );
+    
+trigger_capture_channel_2 : entity trigger_capture
+    generic map(
+        c_data_width    => 32
+    )
+    Port map( 
+      clk               => clk_125MHz,
+      rst               => rst,
+      control_reg       => trig_set_up_reg,
+      control_reg_wr_en => wr_req_vec(5),
+
+      data              => m_stream_data(63 downto 32),   -- входные значения данных от АЦП
+      ext_trig          => ext_trig,        -- внешний триггер
+      
+      trigger_start     => trigger_start_channel_2    -- выходной сигнал управляет модулем захвата данных
+    );
+
+
+-- выбор управляющего канала для захвата триггера
+
+channel_control <= trig_set_up_reg(3 downto 2);
+
+trigger_start_mux_process:
+    process (channel_control, trigger_start_channel_1, trigger_start_channel_2)
+    begin
+      case channel_control is 
+         when "00" => trigger_start <= trigger_start_channel_1 or trigger_start_channel_2;
+         when "01" => trigger_start <= trigger_start_channel_1;
+         when "10" => trigger_start <= trigger_start_channel_2;
+         when others => trigger_start<= trigger_start_channel_1 or trigger_start_channel_2;
+      end case;
+    end process;
+    
+
+capture_module_rst <= rst or spifi_cs_up;
 
 stream_data_capture_inst    : entity data_capture_module
     generic map (
@@ -255,7 +298,7 @@ stream_data_capture_inst    : entity data_capture_module
     )
     Port map(
       clk                   => clk_125MHz,
-      rst                   => rst,
+      rst                   => capture_module_rst,
       trigger_start         => trigger_start,
       window_size           => trig_window_width_reg,
       trig_position         => trig_position_reg,
@@ -342,7 +385,7 @@ m_fcb_wr_process :
     process(clk_125MHz)
     begin
       if rising_edge(clk_125MHz) then
-        if (rst = '1') then
+        if (infrst_rst_out = '1') then
           wr_req_vec <= (others => '0');
           control_reg(1 downto 0) <= (others => '0');
         elsif (m_fcb_wrreq = '1') then
@@ -350,7 +393,7 @@ m_fcb_wr_process :
           case reg_address_int is
             when 0 => 
               wr_req_vec(0) <= '1';
-              trig_set_up_reg <= m_fcb_wrdata;
+              trig_set_up_reg(15 downto 2) <= m_fcb_wrdata(15 downto 2);
             when 1 => 
               wr_req_vec(1) <= '1';
               trig_window_width_reg <= m_fcb_wrdata;
@@ -364,6 +407,9 @@ m_fcb_wr_process :
             when 4 =>
               wr_req_vec(4) <= '1';
               calib_pattern_reg <= m_fcb_wrdata;
+            when 5 =>
+              wr_req_vec(5) <= '1';
+              trig_set_up_reg(1 downto 0) <= m_fcb_wrdata(1 downto 0);
             when others =>
           end case;
         else 
@@ -382,7 +428,7 @@ m_fcb_rd_process :
     process(clk_125MHz)
     begin
       if rising_edge(clk_125MHz) then
-        if (rst = '1') then
+        if (infrst_rst_out = '1') then
         elsif (m_fcb_rdreq = '1') then
           m_fcb_rdack <= '1';
           case reg_address_int is
