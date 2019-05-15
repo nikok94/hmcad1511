@@ -36,13 +36,15 @@ entity infrastructure_module is
       clk_in        : in std_logic;
       rst_in        : in std_logic;
       pll_lock      : out std_logic;
-      clk_out       : out std_logic;
+      clk_out_125MHz: out std_logic;
+      clk_out_250MHz: out std_logic;
       rst_out       : out std_logic
     );
 end infrastructure_module;
 
 architecture Behavioral of infrastructure_module is
     signal pll_clkout_0     : std_logic;
+    signal pll_clkout_1     : std_logic;
     signal CLKFBOUT         : std_logic;
     signal CLKFBOUT_bufg    : std_logic;
     signal CLKFBIN          : std_logic;
@@ -75,7 +77,7 @@ PLL_BASE_inst : PLL_BASE
                                             -- MHz).
       -- CLKOUT0_DIVIDE - CLKOUT5_DIVIDE: Divide amount for CLKOUT# clock output (1-128)
       CLKOUT0_DIVIDE => 6,
-      CLKOUT1_DIVIDE => 1,
+      CLKOUT1_DIVIDE => 3,
       CLKOUT2_DIVIDE => 1,
       CLKOUT3_DIVIDE => 1,
       CLKOUT4_DIVIDE => 1,
@@ -104,7 +106,7 @@ PLL_BASE_inst : PLL_BASE
       CLKFBOUT => CLKFBOUT, -- 1-bit output: PLL_BASE feedback output
       -- CLKOUT0 - CLKOUT5: 1-bit (each) output: Clock outputs
       CLKOUT0 => pll_clkout_0,
-      CLKOUT1 => open,
+      CLKOUT1 => pll_clkout_1,
       CLKOUT2 => open,
       CLKOUT3 => open,
       CLKOUT4 => open,
@@ -116,7 +118,8 @@ PLL_BASE_inst : PLL_BASE
    );
 pll_lock <= LOCKED;
 bufg1_inst : BUFG port map ( I => CLKFBOUT, O => CLKFBOUT_bufg);
-bufg2_inst : BUFG port map ( I => pll_clkout_0, O => clk_out);
+bufg2_inst : BUFG port map ( I => pll_clkout_0, O => clk_out_125MHz);
+bufg3_inst : BUFG port map ( I => pll_clkout_1, O => clk_out_250MHz);
 --bufg3_inst : BUFG port map ( I => rst, O => rst_out);
 rst_out <= rst;
 

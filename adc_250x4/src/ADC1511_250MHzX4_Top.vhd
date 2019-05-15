@@ -126,6 +126,7 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal m_strm_ready                             : std_logic;
     
     signal clk_125MHz                               : std_logic;
+    signal clk_250MHz                               : std_logic;
     signal stream_fifo_rst                          : std_logic;
     signal m_stream_valid                           : std_logic;
     signal m_stream_data                            : std_logic_vector(63 downto 0);
@@ -176,7 +177,8 @@ infr_inst : entity infrastructure_module
       clk_in        => adc_clk_div8,
       rst_in        => '0',
       pll_lock      => pll_lock,
-      clk_out       => clk_125MHz,
+      clk_out_125MHz=> clk_125MHz,
+      clk_out_250MHz=> clk_250MHz,
       rst_out       => infrst_rst_out
     );
 
@@ -224,20 +226,20 @@ Stream_fifo_inst : ENTITY fifo_sream
 
 fast_adc_calib_done <= m_stream_valid;
 
-capture_valid_proc :
-    process(clk_125MHz)
-    begin
-      if rising_edge(clk_125MHz) then
-        if (rst = '1') or (spifi_cs_up = '1') then
-          fast_adc_data_valid <= '0';
-        elsif m_strm_valid = '1' then
-          fast_adc_data_valid <= '1';
-        end if;
-        spifi_cs_d <= spifi_cs;
-      end if;
-    end process;
-
-spifi_cs_up <= spifi_cs and (not spifi_cs_d);
+--capture_valid_proc :
+--    process(clk_125MHz)
+--    begin
+--      if rising_edge(clk_125MHz) then
+--        if (rst = '1') or (spifi_cs_up = '1') then
+--          fast_adc_data_valid <= '0';
+--        elsif m_strm_valid = '1' then
+--          fast_adc_data_valid <= '1';
+--        end if;
+--        spifi_cs_d <= spifi_cs;
+--      end if;
+--    end process;
+--
+--spifi_cs_up <= spifi_cs and (not spifi_cs_d);
 
 trigger_capture_channel_1 : entity trigger_capture
     generic map(
@@ -316,6 +318,7 @@ stream_data_capture_inst    : entity data_capture_module
 
 QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
     Port map(
+      clk_250MHz_in     => clk_250MHz,
       spifi_cs          => spifi_cs  ,
       spifi_sck         => spifi_sck ,
       spifi_miso        => spifi_miso,
@@ -328,7 +331,7 @@ QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
       s_strm_data       => m_strm_data,
       s_strm_valid      => m_strm_valid,
       s_strm_ready      => m_strm_ready,
-      compleat          => qspi_compleat
+      fast_adc_valid    => fast_adc_data_valid
     );
 
 -- Модуль SPI для прогрузки управляющих регистров 

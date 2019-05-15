@@ -70,7 +70,7 @@ sck_rising_edge_process :
         spi_byte_shift_reg <= (others => '0');
       elsif (start = '1') then
         spi_byte_shift_reg <= data_8byte;
-      elsif falling_edge(SCK) then
+      elsif rising_edge(SCK) then
         if spi_byte_shift_counter = "10000" then
           spi_byte_shift_counter <= ( 0 => '1', others => '0');
         else

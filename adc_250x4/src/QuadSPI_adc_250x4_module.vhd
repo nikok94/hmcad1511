@@ -21,12 +21,12 @@
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_unsigned.ALL;
 
 library work;
-use work.QuadSpi_x4_8byte_tranceiver;
-use work.spi_byte_receiver;
-use work.chipscope_icon_qspi;
-use work.chipscope_ila_qspi;
+use work.fifo_64_8;
+--use work.chipscope_icon_qspi;
+--use work.chipscope_ila_qspi;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -44,6 +44,7 @@ entity QuadSPI_adc_250x4_module is
       C_LSB_FIRST       : integer := 0
       );
     Port (
+      clk_250MHz_in     : in std_logic;
       spifi_cs          : in std_logic;
       spifi_sck         : in std_logic;
       spifi_miso        : inout std_logic;
@@ -56,15 +57,16 @@ entity QuadSPI_adc_250x4_module is
       s_strm_data       : in std_logic_vector(63 downto 0);
       s_strm_valid      : in std_logic;
       s_strm_ready      : out std_logic;
-      compleat          : out std_logic
+      fast_adc_valid    : out std_logic
     );
 end QuadSPI_adc_250x4_module;
 
 architecture Behavioral of QuadSPI_adc_250x4_module is
-    type state_machine is (idle, rd_start_byte, cmd_decode, s_strm_read, qspi_trans_start, qspi_trans, qspi_trans_compleat);
+    type state_machine is (idle, rd_start_byte, nibble_1, nibble_2);
     signal state, next_state    : state_machine;
-    signal spi_rec_byte         : std_logic_vector(7 downto 0);
-    signal spi_rec_valid        : std_logic;
+    signal command_bit_counter  : std_logic_vector(3 downto 0);
+    signal command_byte         : std_logic_vector(7 downto 0);
+    signal command_valid        : std_logic;
     signal spifi_tri_state      : std_logic:= '1';
     signal mosi_i               : std_logic;
     signal mosi_o               : std_logic;
@@ -80,11 +82,29 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal quad_compleat        : std_logic;
     signal ready                : std_Logic;
     signal ila_control_0        : std_logic_vector(35 downto 0);
-
+    signal fifo_rst             : STD_LOGIC;
+    signal fifo_wr_en           : STD_LOGIC;
+    signal fifo_rd_en           : STD_LOGIC;
+    signal fifo_dout            : STD_LOGIC_VECTOR(7 DOWNTO 0);
+    signal fifo_full            : STD_LOGIC;
+    signal fifo_empty           : STD_LOGIC;
+    signal fifo_valid           : STD_LOGIC;
+    signal spifi_sck_d          : std_logic;
+    signal spifi_sck_d_1        : std_logic;
+    signal spifi_cs_d           : std_logic;
+    signal spifi_cs_down        : std_logic;
+    signal spifi_cs_up          : std_logic;
+    signal spifi_sck_edge       : std_Logic;
+    signal spifi_sck_fall       : std_logic;
+    signal nibble               : std_logic_vector(3 downto 0);
+    signal next_byte            : std_logic;
+    signal next_byte_d1         : std_logic;
+    signal next_byte_d2         : std_logic;
+    signal next_byte_d3         : std_logic;
+    
 begin
 
-s_strm_ready <= ready;
-compleat <= quad_compleat;
+--s_strm_ready <= ready;
 
 MOSI_IOBUF_inst : IOBUF
    generic map (
@@ -134,130 +154,130 @@ SIO3_IOBUF_inst : IOBUF
       T => spifi_tri_state      -- 3-state enable input, high=input, low=output 
    );
 
-spi_byte_receiver_inst : entity spi_byte_receiver
-    Generic map(
-      C_CPHA        => C_CPHA     ,
-      C_CPOL        => C_CPOL     ,
-      C_LSB_FIRST   => C_LSB_FIRST
-    )
-    Port map(
-      SCK          => spifi_sck ,
-      CS           => spifi_cs,
-      MOSI         => mosi_i,
-      
-      clk          => s_strm_clk,
-      rst          => s_strm_rst,
-      byte         => spi_rec_byte,
-      valid        => spi_rec_valid
-    );
-    
-QuadSpi_x4_8byte_tranceiver_inst : entity QuadSpi_x4_8byte_tranceiver
-    generic map(
-      C_CPHA            => 0,
-      C_CPOL            => 0,
-      C_LSB_FIRST       => 0
-      )
-    Port map(
-      cs                => spifi_cs ,
-      sck               => spifi_sck,
-      miso              => miso_o,
-      mosi              => mosi_o,
-      sio2              => sio2_o,
-      sio3              => sio3_o,
+delay_process:
+    process(s_strm_clk)
+    begin
+      if rising_edge(s_strm_clk) then
+        spifi_cs_d  <= spifi_cs;
+      end if;
+    end process;
+spifi_cs_up     <= (not spifi_cs_d) and spifi_cs;
 
-      clk               => s_strm_clk,
-      rst               => s_strm_rst,
-      data_8byte        => data_8byte,
-      start             => start     ,
-      ready             => quad_tr_ready     
-    );
+command_byte_proc:
+  process(spifi_sck, spifi_cs)
+  begin
+    if (spifi_cs = '1') then
+      command_bit_counter <= (others => '0');
+      command_byte  <= (others => '0');
+    elsif rising_edge(spifi_sck) then
+      if command_valid = '0' then 
+        command_bit_counter <= command_bit_counter + 1;
+        command_byte(7 downto 1) <= command_byte( 6 downto 0);
+        command_byte(0) <= mosi_i;
+      end if;
+    end if;
+  end process;
+
+command_valid <= command_bit_counter(3);
+
+sck_delay_process:
+    process(clk_250MHz_in)
+    begin
+      if rising_edge(clk_250MHz_in) then
+        next_byte_d1 <= next_byte;
+        next_byte_d2 <= next_byte_d1;
+        next_byte_d3 <= next_byte_d2;
+      end if;
+    end process;
+
+fifo_rd_en <= (not next_byte_d3) and next_byte_d2;
+
+next_byte <= '1' when (spifi_sck = '1') and (state = nibble_2) else '0';
+
+fifo_inst : ENTITY fifo_64_8
+  PORT MAP(
+    rst     => fifo_rst,
+    wr_clk  => s_strm_clk,
+    rd_clk  => clk_250MHz_in,
+    din     => s_strm_data,
+    wr_en   => fifo_wr_en,
+    rd_en   => fifo_rd_en,
+    dout    => fifo_dout ,
+    full    => fifo_full ,
+    empty   => fifo_empty,
+    valid   => fifo_valid
+  );
+fast_adc_valid <= fifo_valid;
+fifo_wr_en <= s_strm_valid and (not fifo_full);
+s_strm_ready <= not fifo_full;
+
+fifo_rst <= spifi_cs_up;
+
+nibble <= fifo_dout(3 downto 0) when (state = nibble_2) else fifo_dout(7 downto 4);
+
+mosi_o <= nibble(0);
+miso_o <= nibble(1);
+sio2_o <= nibble(2);
+sio3_o <= nibble(3);
 
 state_sync_proc :
-  process(s_strm_clk) 
+  process(spifi_sck, spifi_cs, s_strm_rst) 
   begin
-    if rising_edge(s_strm_clk) then
-      if (spifi_cs = '1' or s_strm_rst = '1')then
-        state <= idle;
-      else 
-        state <= next_state;
-      end if;
+    if (spifi_cs = '1' or s_strm_rst = '1') then
+      state <= idle;
+    elsif rising_edge(spifi_sck) then
+      state <= next_state;
     end if;
   end process;
 
 state_data_proc:
   process(state) 
   begin
-    ready <= '0';
     spifi_tri_state <= '1';
-    start <= '0';
-    quad_compleat <= '0';
       case state is
         when idle =>
         when rd_start_byte =>
-        when cmd_decode =>
-        when s_strm_read =>
-          ready <= '1';
-          spifi_tri_state <= '0';
-          data_8byte <= s_strm_data;
-        when qspi_trans_start =>
-          start <= '1';
-          spifi_tri_state <= '0';
-        when qspi_trans => 
-          spifi_tri_state <= '0';
-        when qspi_trans_compleat => 
-          quad_compleat <= '1';
+        when nibble_1 =>
+            spifi_tri_state <= '0';
+        when nibble_2 =>
+            spifi_tri_state <= '0';
         when others =>
       end case;
   end process;
 
 next_state_proc:
-  process(state, spi_rec_valid, quad_tr_ready, s_strm_valid, ready, spi_rec_byte) 
+  process(state, command_valid) 
   begin
     next_state <= state;
       case state is
       when idle =>
         next_state <= rd_start_byte;
       when rd_start_byte =>
-        if (spi_rec_valid  = '1') then
-          next_state <= cmd_decode;
+        if (command_valid  = '1') then
+          case command_byte is 
+            when x"00" => next_state <= nibble_1;
+            when others => next_state <= idle;
+          end case;
         end if;
-      when cmd_decode =>
-        if (spi_rec_byte(0) = '0') then
-          next_state <= s_strm_read;
-        else 
-          next_state <= idle;
-        end if;
-      when s_strm_read =>
-        if (s_strm_valid = '1') and (ready = '1') then
-          next_state <= qspi_trans_start;
-        end if;
-      when qspi_trans_start =>
-          next_state <= qspi_trans;
-      when qspi_trans => 
-        if (quad_tr_ready = '1') then
-          if s_strm_valid = '1' then 
-            next_state <= s_strm_read;
-          else
-            next_state <= qspi_trans_compleat;
-          end if;
-        end if;
-      when qspi_trans_compleat => 
-        next_state <= idle;
+      when nibble_1 =>
+          next_state <= nibble_2;
+      when nibble_2 =>
+          next_state <= nibble_1;
       when others =>
          next_state <= idle;
       end case;
   end process;
 
-ila_reg_inst : entity chipscope_ila_qspi 
-  port map (
-    CONTROL     => ila_control_0,
-    CLK         => s_strm_clk,
-    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid & s_strm_data,
-    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid
-    );
-icon_inst : ENTITY chipscope_icon_qspi
-  port map (
-    CONTROL0 => ila_control_0
-    );
+--ila_reg_inst : entity chipscope_ila_qspi 
+--  port map (
+--    CONTROL     => ila_control_0,
+--    CLK         => clk_250MHz_in,
+--    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid & s_strm_data,
+--    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid
+--    );
+--icon_inst : ENTITY chipscope_icon_qspi
+--  port map (
+--    CONTROL0 => ila_control_0
+--    );
 
 end Behavioral;

@@ -192,7 +192,7 @@ next_state_machine_proc :
           end if;
         when capture =>
           if (wr_addr = addr_end_position) then
-            next_state <= send_word;
+            next_state <= buff_state;
           end if;
         when send_word =>
           if (m_strm_ready = '1') then

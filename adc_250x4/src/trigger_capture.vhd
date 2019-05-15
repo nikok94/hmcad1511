@@ -64,15 +64,16 @@ architecture Behavioral of trigger_capture is
     signal level_down_start : std_logic;
     signal level_down       : std_logic:= '0';
     signal level_down_d     : std_logic:= '0';
-    signal old_data         : std_logic_vector(c_data_width-1 downto 0);
     signal level_up_vect    : std_logic_vector(c_data_width/8 - 1 downto 0);
     signal level_down_vect  : std_logic_vector(c_data_width/8 - 1 downto 0);
+    signal data_to_compare  : std_logic_vector(c_data_width + 7 downto 0);
+    signal old_data_byte    : std_logic_vector(7 downto 0);
     signal capture_enable   : std_logic;
     signal capture_start    : std_logic;
 
 begin
 
-trigger_start <= capture_start when capture_enable = '1' else '0';
+trigger_start <= capture_start;
 
 capture_enable_proc :
   process(clk)
@@ -93,33 +94,36 @@ control_reg_process :
       if rst = '1' then 
         capture_mode <= "00";
         capture_level <= x"7f";
-        control_reg_setup <= (others => '0');
       elsif (control_reg_wr_en = '1') then
         capture_mode <= control_reg(1 downto 0);
         capture_level <= control_reg(15 downto 8);
-        control_reg_setup(0) <= '1';
-      elsif (capture_mode = "00") then
-        control_reg_setup(0) <= '0';
-        control_reg_setup(3 downto 1) <= control_reg_setup(2 downto 0);
-        control_start <= (not control_reg_setup(3)) and control_reg_setup(2);
-      else 
-        control_start <= '0';
       end if;
     end if;
   end process;
+
+control_start_process :
+    process(clk)
+    begin
+      if rising_edge(clk) then
+        if (rst = '1') or (capture_start = '1') then
+          control_start <= '0';
+        elsif (capture_mode = "00") then
+          if (control_reg_wr_en = '1') then
+            control_start <= '1';
+          end if;
+        end if;
+      end if;
+    end process;
 
 ext_start_proc :
   process(clk)
   begin
     if rising_edge(clk) then
-      if rst = '1' then 
+      if (rst = '1') or (capture_start = '1') then 
         ext_start_sync_vec <= (others => '0');
-      elsif (capture_mode = "11") then
+      else
         ext_start_sync_vec(0) <= ext_trig;
-        ext_start_sync_vec(3 downto 1) <= ext_start_sync_vec(2 downto 0);
-        ext_start <= (not ext_start_sync_vec(3)) and ext_start_sync_vec(2);
-      else 
-        ext_start <= '0';
+        ext_start_sync_vec(2 downto 1) <= ext_start_sync_vec(1 downto 0);
       end if;
     end if;
   end process;
@@ -131,64 +135,63 @@ trigger_start_out_proc :
       if rst = '1' then
         capture_start <= '0';
       else
-        case capture_mode is
-          when "00" => capture_start <= control_start;
-          when "01" => capture_start <= level_up_start;
-          when "10" => capture_start <= level_down_start;
-          when "11" => capture_start <= ext_start;
-          when others => capture_start <= '0';
-        end case;
+        if (capture_enable = '1') then
+          case capture_mode is
+            when "00" => capture_start <= control_start;
+            when "01" => capture_start <= level_up;
+            when "10" => capture_start <= level_down;
+            when "11" => capture_start <= ext_start_sync_vec(2);
+            when others => capture_start <= '0';
+          end case;
+        else
+          capture_start <= '0';
+        end if;
       end if;
     end if;
   end process;
-
-old_data_process :
-  process(clk)
-  begin
-    if rising_edge(clk) then
-      if rst = '1' then 
-        old_data <= (others => '0');
-      else 
-        old_data <= data;
-      end if;
-    end if;
-  end process;
-
-generate_process : for i in 0 to c_data_width/8 - 1 generate
-  level_up_vect(i) <= '1' when ((old_data(8*i + 7 downto 8*i) < data(8*i + 7 downto 8*i)) and (old_data(8*i + 7 downto 8*i) >= capture_level)) else '0';
-  level_down_vect(i) <= '1' when ((old_data(8*i + 7 downto 8*i) > data(8*i + 7 downto 8*i)) and (old_data(8*i + 7 downto 8*i) <= capture_level)) else '0';
-end generate generate_process;
-
-level_up_process :
+  
+old_data_byte_process :
   process(clk)
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        level_up   <= '0';
-      elsif (level_up_vect /= 0) then 
-        level_up <= '1';
-      elsif (control_reg_wr_en = '1') then
-        level_up <= '0';
+        old_data_byte   <= (others => '0');
+      else
+        old_data_byte <= data(c_data_width-1 downto c_data_width - 8);
       end if;
-      level_up_d <= level_up;
-      level_up_start <= (not level_up_d) and level_up;
     end if;
   end process;
 
-level_down_process :
-    process(clk)
-    begin
-      if rising_edge(clk) then
-        if rst = '1' then
-          level_down   <= '0';
-        elsif (level_down_vect /= 0) then 
-          level_down <= '1';
-        elsif (control_reg_wr_en = '1') then
-          level_down <= '0';
-        end if;
-        level_down_d <= level_down;
-        level_down_start <= (not level_down_d) and level_down;
+data_to_compare <= data & old_data_byte;
+
+generate_process : for i in 1 to c_data_width/8 generate
+level_up_compare_proc:
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if (data_to_compare(8*i + 7 downto 8*i) > data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and (data_to_compare(8*i + 7 downto 8*i) >= capture_level)) then
+        level_up_vect(i-1) <= '1';
+      else
+        level_up_vect(i-1) <= '0';
       end if;
-    end process;
+    end if;
+  end process;
+
+level_down_compare_proc:
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if (data_to_compare(8*i + 7 downto 8*i) < data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and (data_to_compare(8*i + 7 downto 8*i) <= capture_level)) then
+        level_down_vect(i-1) <= '1';
+      else
+        level_down_vect(i-1) <= '0';
+      end if;
+    end if;
+  end process;
+  
+end generate generate_process;
+
+level_up <= '1' when (level_up_vect /= 0) else '0';
+level_down <= '1' when (level_down_vect /= 0) else '0';
 
 end Behavioral;
