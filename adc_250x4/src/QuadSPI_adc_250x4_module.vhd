@@ -192,7 +192,16 @@ sck_delay_process:
 
 fifo_rd_en <= (not next_byte_d3) and next_byte_d2;
 
-next_byte <= '1' when (spifi_sck = '1') and (state = nibble_2) else '0';
+process(spifi_sck)
+begin
+  if rising_edge(spifi_sck) then
+    if (state = nibble_1) then 
+      next_byte <= '1';
+    else
+      next_byte <= '0';
+    end if;
+  end if;
+end process;
 
 fifo_inst : ENTITY fifo_64_8
   PORT MAP(

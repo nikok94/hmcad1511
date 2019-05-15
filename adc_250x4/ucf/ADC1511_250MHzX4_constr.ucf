@@ -104,3 +104,4 @@ NET "ext_trig" LOC = P93;
 NET "ext_trig" IOSTANDARD = LVCMOS33;
 
 
+NET "stream_data_capture_inst/fifo_full" KEEP = "TRUE";
