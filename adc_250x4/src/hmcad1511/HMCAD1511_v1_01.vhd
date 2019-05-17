@@ -315,53 +315,5 @@ end generate;
                    adc_data_b_8bit(2) & adc_data_a_8bit(2) & 
                    adc_data_b_8bit(1) & adc_data_a_8bit(1) & 
                    adc_data_b_8bit(0) & adc_data_a_8bit(0);
-    
-    
---    iodelay_clk <= div_clk_bufg_1;
---    iodelay_inc <= '1';
---    
---icon_inst : ENTITY chipscope_icon
---  port map(
---    CONTROL0    => vio_calib_control,
---    CONTROL1    => ila_control
---    );
---
---vio_calib_inst :ENTITY chipscope_vio_3
---  port map(
---    CONTROL		=> vio_calib_control,
---    CLK			=> div_clk_bufg_1,
---    SYNC_OUT	=> vio_calib_vector
---    );
---
---ila_inst : ENTITY ila
---  port map(
---    CONTROL => ila_control,
---    CLK     => div_clk_bufg_1,
---    DATA    => DATA_out(63 downto 0),
---    TRIG0(0)   => iodelay_calib
---    );
---
---    DATA_out(7 downto 0)        <= adc_data_a_8bit(0);
---    DATA_out(15 downto 8)       <= adc_data_b_8bit(0);
---    DATA_out(23 downto 16)      <= adc_data_a_8bit(1);
---    DATA_out(31 downto 24)      <= adc_data_b_8bit(1);
---    DATA_out(39 downto 32)      <= adc_data_a_8bit(2);
---    DATA_out(47 downto 40)      <= adc_data_b_8bit(2);
---    DATA_out(55 downto 48)      <= adc_data_a_8bit(3);
---    DATA_out(63 downto 56)      <= adc_data_b_8bit(3);
---    DATA_out(66 downto 64)      <= "000";
---
---
---
---process(div_clk_bufg_1)
---begin
---  if rising_edge(div_clk_bufg_1) then
---    vio_calib_vector_d <= vio_calib_vector;
---    iodelay_calib<= (not vio_calib_vector_d(3)) and vio_calib_vector(3);
---    iodelay_ce  <= (not vio_calib_vector_d(2)) and vio_calib_vector(2);
---    iodelay_cal <= (not vio_calib_vector_d(1)) and vio_calib_vector(1);
---    iodelay_rst <= (not vio_calib_vector_d(0)) and vio_calib_vector(0);
---  end if;
---end process;
 
 end Behavioral;

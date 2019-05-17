@@ -1,5 +1,5 @@
-#NET "in_clk_20MHz" LOC = P56;
-#NET "in_clk_20MHz" PERIOD = 20 MHz HIGH 50 %;
+NET "in_clk_20MHz" LOC = P56;
+NET "in_clk_20MHz" PERIOD = 20 MHz HIGH 50 %;
 
 #NET "adc_fclk_p" LOC = P124 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
 #NET "adc_fclk_n" LOC = P123 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
@@ -76,7 +76,8 @@ NET "fast_adc_data_valid" IOSTANDARD = LVCMOS33;
 NET "fast_adc_calib_done" LOC = P87;
 NET "fast_adc_calib_done" IOSTANDARD = LVCMOS33;
 
-#NET "low_adc_data_valid" LOC = P88 | IOSTANDARD = LVCMOS33;
+NET "low_adc_data_valid" LOC = P88;
+NET "low_adc_data_valid" IOSTANDARD = LVCMOS33;
 
 NET "spifi_cs" LOC = P8;
 NET "spifi_cs" IOSTANDARD = LVCMOS33;
@@ -103,5 +104,29 @@ NET "fpga_sck" IOSTANDARD = LVCMOS33;
 NET "ext_trig" LOC = P93;
 NET "ext_trig" IOSTANDARD = LVCMOS33;
 
+NET "data_9_0[9]" LOC = P62;
+NET "data_9_0[9]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[8]" LOC = P61;
+NET "data_9_0[8]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[7]" LOC = P58;
+NET "data_9_0[7]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[6]" LOC = P57;
+NET "data_9_0[6]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[5]" LOC = P51;
+NET "data_9_0[5]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[4]" LOC = P50;
+NET "data_9_0[4]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[3]" LOC = P48;
+NET "data_9_0[3]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[2]" LOC = P47;
+NET "data_9_0[2]" IOSTANDARD = LVCMOS25;
+NET "data_9_0[1]" LOC = P45;
+NET "data_9_0[1]" IOSTANDARD = LVCMOS25;
 
-NET "stream_data_capture_inst/fifo_full" KEEP = "TRUE";
+NET "low_adc_clk_out" LOC = P44;
+NET "low_adc_clk_out" IOSTANDARD = LVCMOS25;
+
+
+
+
+

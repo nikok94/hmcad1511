@@ -34,7 +34,8 @@ add_files -norecurse ../src/hmcad1511/HMCAD1511_v1_01.vhd
 add_files -norecurse ../src/hmcad1511/lvds_deserializer.vhd
 add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/blk_mem_gen_v7_3_0/mem_64_4096.xci
-
+add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci
+add_files -norecurse ../src/clock_generator_low_adc.vhd
 ########################################################################
 # UCF
 add_files -fileset [current_fileset -constrset] -norecurse ../ucf/ADC1511_250MHzX4_constr.ucf

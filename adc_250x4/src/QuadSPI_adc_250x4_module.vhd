@@ -25,6 +25,7 @@ use IEEE.STD_LOGIC_unsigned.ALL;
 
 library work;
 use work.fifo_64_8;
+use work.fifo_16_8;
 --use work.chipscope_icon_qspi;
 --use work.chipscope_ila_qspi;
 
@@ -57,7 +58,15 @@ entity QuadSPI_adc_250x4_module is
       s_strm_data       : in std_logic_vector(63 downto 0);
       s_strm_valid      : in std_logic;
       s_strm_ready      : out std_logic;
-      fast_adc_valid    : out std_logic
+      fast_adc_valid    : out std_logic;
+      
+      low_channel_activ : out std_logic;
+      low_adc_clk           : in std_logic;
+      low_adc_m_strm_data   : in std_logic_vector(15 downto 0);
+      low_adc_m_strm_valid  : in std_logic;
+      low_adc_m_strm_ready  : out std_logic;
+      low_adc_valid         : out std_logic
+      
     );
 end QuadSPI_adc_250x4_module;
 
@@ -82,13 +91,22 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal quad_compleat        : std_logic;
     signal ready                : std_Logic;
     signal ila_control_0        : std_logic_vector(35 downto 0);
-    signal fifo_rst             : STD_LOGIC;
-    signal fifo_wr_en           : STD_LOGIC;
-    signal fifo_rd_en           : STD_LOGIC;
-    signal fifo_dout            : STD_LOGIC_VECTOR(7 DOWNTO 0);
-    signal fifo_full            : STD_LOGIC;
-    signal fifo_empty           : STD_LOGIC;
-    signal fifo_valid           : STD_LOGIC;
+    signal fast_fifo_rst        : STD_LOGIC;
+    signal fast_fifo_wr_en      : STD_LOGIC;
+    signal fast_fifo_rd_en      : STD_LOGIC;
+    signal fast_fifo_dout       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+    signal fast_fifo_full       : STD_LOGIC;
+    signal fast_fifo_empty      : STD_LOGIC;
+    signal fast_fifo_valid      : STD_LOGIC;
+    
+    signal low_fifo_rst         : STD_LOGIC;
+    signal low_fifo_wr_en       : STD_LOGIC;
+    signal low_fifo_rd_en       : STD_LOGIC;
+    signal low_fifo_dout        : STD_LOGIC_VECTOR(7 DOWNTO 0);
+    signal low_fifo_full        : STD_LOGIC;
+    signal low_fifo_empty       : STD_LOGIC;
+    signal low_fifo_valid       : STD_LOGIC;
+    
     signal spifi_sck_d          : std_logic;
     signal spifi_sck_d_1        : std_logic;
     signal spifi_cs_d           : std_logic;
@@ -101,10 +119,11 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal next_byte_d1         : std_logic;
     signal next_byte_d2         : std_logic;
     signal next_byte_d3         : std_logic;
+    signal low_activ            : std_logic;
     
 begin
 
---s_strm_ready <= ready;
+low_channel_activ <= low_activ;
 
 MOSI_IOBUF_inst : IOBUF
    generic map (
@@ -168,15 +187,16 @@ command_byte_proc:
   begin
     if (spifi_cs = '1') then
       command_bit_counter <= (others => '0');
-      command_byte  <= (others => '0');
     elsif rising_edge(spifi_sck) then
-      if command_valid = '0' then 
+      if (state = rd_start_byte) then
         command_bit_counter <= command_bit_counter + 1;
         command_byte(7 downto 1) <= command_byte( 6 downto 0);
         command_byte(0) <= mosi_i;
       end if;
     end if;
   end process;
+
+low_activ <= command_byte(0);
 
 command_valid <= command_bit_counter(3);
 
@@ -190,7 +210,8 @@ sck_delay_process:
       end if;
     end process;
 
-fifo_rd_en <= (not next_byte_d3) and next_byte_d2;
+fast_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and (not low_activ);
+low_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and low_activ;
 
 process(spifi_sck)
 begin
@@ -203,26 +224,49 @@ begin
   end if;
 end process;
 
-fifo_inst : ENTITY fifo_64_8
+low_adc_fifo_inst : ENTITY fifo_16_8
   PORT MAP(
-    rst     => fifo_rst,
+    rst     => low_fifo_rst,
+    wr_clk  => low_adc_clk,
+    rd_clk  => clk_250MHz_in,
+    din     => low_adc_m_strm_data,
+    wr_en   => low_fifo_wr_en,
+    rd_en   => low_fifo_rd_en,
+    dout    => low_fifo_dout ,
+    full    => low_fifo_full ,
+    empty   => low_fifo_empty,
+    valid   => low_fifo_valid
+  );
+low_adc_valid <= low_fifo_valid;
+low_fifo_wr_en <= low_adc_m_strm_valid and (not low_fifo_full);
+low_adc_m_strm_ready <= not low_fifo_full;
+
+low_fifo_rst <= spifi_cs_up and low_activ;
+
+fast_adc_fifo_inst : ENTITY fifo_64_8
+  PORT MAP(
+    rst     => fast_fifo_rst,
     wr_clk  => s_strm_clk,
     rd_clk  => clk_250MHz_in,
     din     => s_strm_data,
-    wr_en   => fifo_wr_en,
-    rd_en   => fifo_rd_en,
-    dout    => fifo_dout ,
-    full    => fifo_full ,
-    empty   => fifo_empty,
-    valid   => fifo_valid
+    wr_en   => fast_fifo_wr_en,
+    rd_en   => fast_fifo_rd_en,
+    dout    => fast_fifo_dout ,
+    full    => fast_fifo_full ,
+    empty   => fast_fifo_empty,
+    valid   => fast_fifo_valid
   );
-fast_adc_valid <= fifo_valid;
-fifo_wr_en <= s_strm_valid and (not fifo_full);
-s_strm_ready <= not fifo_full;
+fast_adc_valid <= fast_fifo_valid;
+fast_fifo_wr_en <= s_strm_valid and (not fast_fifo_full);
+s_strm_ready <= not fast_fifo_full;
 
-fifo_rst <= spifi_cs_up;
+fast_fifo_rst <= spifi_cs_up and (not low_activ);
 
-nibble <= fifo_dout(3 downto 0) when (state = nibble_2) else fifo_dout(7 downto 4);
+nibble <= fast_fifo_dout(3 downto 0) when (state = nibble_2) and (low_activ = '0') else 
+          fast_fifo_dout(7 downto 4) when (state = nibble_1) and (low_activ = '0') else
+          low_fifo_dout(3 downto 0) when (state = nibble_2) and (low_activ = '1') else 
+          low_fifo_dout(7 downto 4) when (state = nibble_1) and (low_activ = '1') else
+          (others => '0');
 
 mosi_o <= nibble(0);
 miso_o <= nibble(1);
@@ -230,9 +274,9 @@ sio2_o <= nibble(2);
 sio3_o <= nibble(3);
 
 state_sync_proc :
-  process(spifi_sck, spifi_cs, s_strm_rst) 
+  process(spifi_sck, spifi_cs) 
   begin
-    if (spifi_cs = '1' or s_strm_rst = '1') then
+    if (spifi_cs = '1') then
       state <= idle;
     elsif rising_edge(spifi_sck) then
       state <= next_state;
