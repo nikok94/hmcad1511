@@ -44,7 +44,6 @@ use work.infrastructure_module;
 use work.fifo_sream;
 use work.spi_adc_250x4_master;
 use work.QuadSPI_adc_250x4_module;
-use work.clock_generator_low_adc;
 use work.low_adc_data_capture;
 
 
@@ -133,6 +132,7 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     
     signal clk_125MHz                               : std_logic;
     signal clk_250MHz                               : std_logic;
+    signal clk_500MHz                               : std_logic;
     signal stream_fifo_rst                          : std_logic;
     signal m_stream_valid                           : std_logic;
     signal m_stream_data                            : std_logic_vector(63 downto 0);
@@ -173,7 +173,7 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal spifi_cs_d                               : std_logic_vector(2 downto 0);
     signal spifi_cs_up                              : std_logic;
     signal capture_module_rst                       : std_logic;
-    signal low_adc_freq_num                         : std_logic_vector(2 downto 0);
+    signal low_adc_freq_divider                     : std_logic_vector(5 downto 0);
     signal low_adc_clk                              : std_logic;
     signal low_adc_gen_lock                         : std_logic;
     signal low_adc_rst                              : std_logic;
@@ -182,48 +182,20 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_m_strm_data                      : std_logic_vector(15 downto 0);
     signal low_adc_m_strm_valid                     : std_logic;
     signal low_adc_m_strm_ready                     : std_logic;
+    signal low_adc_clk_counter                      : std_logic_vector(5 downto 0):= (others => '0');
+    
 
 begin
 
 low_adc_clk_out <= low_adc_clk;
 
-clock_gen_inst : clock_generator
-    Port map ( 
-      in_clk_20MHz        => in_clk_20MHz,
-      rst                 => '0',
-      pll_lock            => open,
-      out_clk_125MHz      => clk_125MHz,
-      out_clk_250MHz      => clk_250MHz,
-      out_clk_500MHz      : out std_logic
-      );
-
-low_adc_clk_option :
-  process(low_adc_freq_num)
-  begin
-    low_adc_clk <= low_adc_clk_100MHz;
-      case low_adc_freq_num is
-        when b"000" =>
-          low_adc_clk <= low_adc_clk_100MHz;
-        when b"001" => 
-          low_adc_clk <= low_adc_clk_90_9MHz;
-        when b"010" =>
-          low_adc_clk <= low_adc_clk_83MHz;
-        when b"011" =>
-          low_adc_clk <= low_adc_clk_71_4MHz;
-        when b"100" =>
-          low_adc_clk <= low_adc_clk_62_5MHz;
-        when b"101" =>
-          low_adc_clk <= low_adc_clk_50MHz;
-        when others =>
-          low_adc_clk <= low_adc_clk_100MHz;
-      end case;
-  end process;
-
 low_adc_rst <= control_reg(5) or (spifi_cs_up and low_channel_activ);
 
 low_adc_data_capture_inst : entity low_adc_data_capture
     Port map(
-      clk               => low_adc_clk,
+      divide_value      => low_adc_freq_divider,
+      low_adc_clk       => low_adc_clk,
+      clk_500MHz        => clk_500MHz,
       rst               => low_adc_rst,
       trig_start        => control_reg(3),
       adc_data          => data_9_0,
@@ -242,8 +214,9 @@ infr_inst : entity infrastructure_module
       clk_in        => adc_clk_div8,
       rst_in        => '0',
       pll_lock      => pll_lock,
-      clk_out_125MHz=> open,
-      clk_out_250MHz=> open,
+      clk_out_125MHz=> clk_125MHz,
+      clk_out_250MHz=> clk_250MHz,
+      clk_out_500MHz=> clk_500MHz,
       rst_out       => infrst_rst_out
     );
 
@@ -395,7 +368,7 @@ QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
       fast_adc_valid    => fast_adc_data_valid,
       
       low_channel_activ => low_channel_activ,
-      low_adc_clk          => low_adc_clk,
+      low_adc_clk          => clk_500MHz,
       low_adc_m_strm_data  => low_adc_m_strm_data ,
       low_adc_m_strm_valid => low_adc_m_strm_valid,
       low_adc_m_strm_ready => low_adc_m_strm_ready,
@@ -460,7 +433,7 @@ m_fcb_wr_process :
           wr_req_vec <= (others => '0');
           control_reg(1 downto 0) <= (others => '0');
           low_adc_buff_len <= x"2004";
-          low_adc_freq_num <= (others => '0');
+          low_adc_freq_divider <= B"000101";
         elsif (m_fcb_wrreq = '1') then
           m_fcb_wrack <= '1';
           case reg_address_int is
@@ -490,7 +463,7 @@ m_fcb_wr_process :
               low_adc_buff_len <= m_fcb_wrdata;
             when 7 =>
               wr_req_vec(7) <= '1';
-              low_adc_freq_num <= m_fcb_wrdata(2 downto 0);
+              low_adc_freq_divider <= m_fcb_wrdata(5 downto 0);
             when others =>
           end case;
         else 
@@ -530,8 +503,8 @@ m_fcb_rd_process :
             when 6 => 
               m_fcb_rddata <= low_adc_buff_len;
             when 7 => 
-              m_fcb_rddata(2 downto 0) <= low_adc_freq_num;
-              m_fcb_rddata(15 downto 3) <= (others => '0');
+              m_fcb_rddata(5 downto 0) <= low_adc_freq_divider;
+              m_fcb_rddata(15 downto 6) <= (others => '0');
             when others =>
           end case;
         else 
