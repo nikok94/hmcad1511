@@ -25,7 +25,7 @@ use IEEE.STD_LOGIC_unsigned.ALL;
 
 library work;
 use work.fifo_64_8;
-use work.fifo_16_8;
+--use work.fifo_16_8;
 --use work.chipscope_icon_qspi;
 --use work.chipscope_ila_qspi;
 
@@ -45,7 +45,6 @@ entity QuadSPI_adc_250x4_module is
       C_LSB_FIRST       : integer := 0
       );
     Port (
-      clk_250MHz_in     : in std_logic;
       spifi_cs          : in std_logic;
       spifi_sck         : in std_logic;
       spifi_miso        : inout std_logic;
@@ -53,19 +52,17 @@ entity QuadSPI_adc_250x4_module is
       spifi_sio2        : inout std_logic;
       spifi_sio3        : inout std_logic;
       
-      s_strm_clk        : in std_logic;
-      s_strm_rst        : in std_logic;
+      clk               : in std_logic;
+      rst               : in std_logic;
       s_strm_data       : in std_logic_vector(63 downto 0);
       s_strm_valid      : in std_logic;
       s_strm_ready      : out std_logic;
       fast_adc_valid    : out std_logic;
       
-      low_channel_activ : out std_logic;
-      low_adc_clk           : in std_logic;
-      low_adc_m_strm_data   : in std_logic_vector(15 downto 0);
+      low_channel_activ     : out std_logic;
+      low_adc_m_strm_data   : in std_logic_vector(7 downto 0);
       low_adc_m_strm_valid  : in std_logic;
-      low_adc_m_strm_ready  : out std_logic;
-      low_adc_valid         : out std_logic
+      low_adc_m_strm_ready  : out std_logic
       
     );
 end QuadSPI_adc_250x4_module;
@@ -73,9 +70,8 @@ end QuadSPI_adc_250x4_module;
 architecture Behavioral of QuadSPI_adc_250x4_module is
     type state_machine is (idle, rd_start_byte, nibble_1, nibble_2);
     signal state, next_state    : state_machine;
-    signal command_bit_counter  : std_logic_vector(3 downto 0);
-    signal command_byte         : std_logic_vector(7 downto 0);
-    signal command_valid        : std_logic;
+    signal command_bit_counter  : std_logic_vector(2 downto 0);
+    signal command_byte         : std_logic_vector(7 downto 0):= (others => '0');
     signal spifi_tri_state      : std_logic:= '1';
     signal mosi_i               : std_logic;
     signal mosi_o               : std_logic;
@@ -98,14 +94,6 @@ architecture Behavioral of QuadSPI_adc_250x4_module is
     signal fast_fifo_full       : STD_LOGIC;
     signal fast_fifo_empty      : STD_LOGIC;
     signal fast_fifo_valid      : STD_LOGIC;
-    
-    signal low_fifo_rst         : STD_LOGIC;
-    signal low_fifo_wr_en       : STD_LOGIC;
-    signal low_fifo_rd_en       : STD_LOGIC;
-    signal low_fifo_dout        : STD_LOGIC_VECTOR(7 DOWNTO 0);
-    signal low_fifo_full        : STD_LOGIC;
-    signal low_fifo_empty       : STD_LOGIC;
-    signal low_fifo_valid       : STD_LOGIC;
     
     signal spifi_sck_d          : std_logic;
     signal spifi_sck_d_1        : std_logic;
@@ -174,9 +162,9 @@ SIO3_IOBUF_inst : IOBUF
    );
 
 delay_process:
-    process(s_strm_clk)
+    process(clk)
     begin
-      if rising_edge(s_strm_clk) then
+      if rising_edge(clk) then
         spifi_cs_d  <= spifi_cs;
       end if;
     end process;
@@ -190,7 +178,7 @@ command_byte_proc:
     elsif rising_edge(spifi_sck) then
       if (state = rd_start_byte) then
         command_bit_counter <= command_bit_counter + 1;
-        command_byte(7 downto 1) <= command_byte( 6 downto 0);
+        command_byte(7 downto 1) <= command_byte(6 downto 0);
         command_byte(0) <= mosi_i;
       end if;
     end if;
@@ -198,12 +186,10 @@ command_byte_proc:
 
 low_activ <= command_byte(0);
 
-command_valid <= command_bit_counter(3);
-
 sck_delay_process:
-    process(clk_250MHz_in)
+    process(clk)
     begin
-      if rising_edge(clk_250MHz_in) then
+      if rising_edge(clk) then
         next_byte_d1 <= next_byte;
         next_byte_d2 <= next_byte_d1;
         next_byte_d3 <= next_byte_d2;
@@ -211,12 +197,15 @@ sck_delay_process:
     end process;
 
 fast_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and (not low_activ);
-low_fifo_rd_en <= (not next_byte_d3) and next_byte_d2 and low_activ;
+
+low_adc_m_strm_ready <= (not next_byte_d3) and next_byte_d2 and low_activ;
+
+
 
 process(spifi_sck)
 begin
   if rising_edge(spifi_sck) then
-    if (state = nibble_1) then 
+    if (next_state = nibble_2) then 
       next_byte <= '1';
     else
       next_byte <= '0';
@@ -224,30 +213,12 @@ begin
   end if;
 end process;
 
-low_adc_fifo_inst : ENTITY fifo_16_8
-  PORT MAP(
-    rst     => low_fifo_rst,
-    wr_clk  => low_adc_clk,
-    rd_clk  => clk_250MHz_in,
-    din     => low_adc_m_strm_data,
-    wr_en   => low_fifo_wr_en,
-    rd_en   => low_fifo_rd_en,
-    dout    => low_fifo_dout ,
-    full    => low_fifo_full ,
-    empty   => low_fifo_empty,
-    valid   => low_fifo_valid
-  );
-low_adc_valid <= low_fifo_valid;
-low_fifo_wr_en <= low_adc_m_strm_valid and (not low_fifo_full);
-low_adc_m_strm_ready <= not low_fifo_full;
-
-low_fifo_rst <= spifi_cs_up and low_activ;
 
 fast_adc_fifo_inst : ENTITY fifo_64_8
   PORT MAP(
     rst     => fast_fifo_rst,
-    wr_clk  => s_strm_clk,
-    rd_clk  => clk_250MHz_in,
+    wr_clk  => clk,
+    rd_clk  => clk,
     din     => s_strm_data,
     wr_en   => fast_fifo_wr_en,
     rd_en   => fast_fifo_rd_en,
@@ -262,16 +233,16 @@ s_strm_ready <= not fast_fifo_full;
 
 fast_fifo_rst <= spifi_cs_up and (not low_activ);
 
-nibble <= fast_fifo_dout(3 downto 0) when (state = nibble_2) and (low_activ = '0') else 
-          fast_fifo_dout(7 downto 4) when (state = nibble_1) and (low_activ = '0') else
-          low_fifo_dout(3 downto 0) when (state = nibble_2) and (low_activ = '1') else 
-          low_fifo_dout(7 downto 4) when (state = nibble_1) and (low_activ = '1') else
+nibble <= fast_fifo_dout(3 downto 0) when (next_state = nibble_1) and (low_activ = '0') else 
+          fast_fifo_dout(7 downto 4) when (next_state = nibble_2) and (low_activ = '0') else
+          low_adc_m_strm_data(3 downto 0) when (next_state = nibble_1) and (low_activ = '1') else 
+          low_adc_m_strm_data(7 downto 4) when (next_state = nibble_2) and (low_activ = '1') else
           (others => '0');
 
-mosi_o <= nibble(0);
-miso_o <= nibble(1);
-sio2_o <= nibble(2);
-sio3_o <= nibble(3);
+  mosi_o <= nibble(0);
+  miso_o <= nibble(1);
+  sio2_o <= nibble(2);
+  sio3_o <= nibble(3);
 
 state_sync_proc :
   process(spifi_sck, spifi_cs) 
@@ -283,38 +254,24 @@ state_sync_proc :
     end if;
   end process;
 
-state_data_proc:
-  process(state) 
-  begin
-    spifi_tri_state <= '1';
-      case state is
-        when idle =>
-        when rd_start_byte =>
-        when nibble_1 =>
-            spifi_tri_state <= '0';
-        when nibble_2 =>
-            spifi_tri_state <= '0';
-        when others =>
-      end case;
-  end process;
 
 next_state_proc:
-  process(state, command_valid) 
+  process(state, command_bit_counter) 
   begin
+    spifi_tri_state <= '1';
     next_state <= state;
       case state is
       when idle =>
         next_state <= rd_start_byte;
       when rd_start_byte =>
-        if (command_valid  = '1') then
-          case command_byte is 
-            when x"00" => next_state <= nibble_1;
-            when others => next_state <= idle;
-          end case;
+        if (command_bit_counter  = b"111") then
+          next_state <= nibble_1;
         end if;
       when nibble_1 =>
+          spifi_tri_state <= '0';
           next_state <= nibble_2;
       when nibble_2 =>
+          spifi_tri_state <= '0';
           next_state <= nibble_1;
       when others =>
          next_state <= idle;
@@ -324,9 +281,9 @@ next_state_proc:
 --ila_reg_inst : entity chipscope_ila_qspi 
 --  port map (
 --    CONTROL     => ila_control_0,
---    CLK         => clk_250MHz_in,
---    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid & s_strm_data,
---    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & quad_compleat & ready & s_strm_valid
+--    CLK         => clk,
+--    DATA        => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & nibble & next_byte & fast_fifo_rd_en & fast_fifo_dout & '0',
+--    TRIG0       => sio3_o & sio2_o & mosi_o & mosi_i &  miso_o & spifi_sck & spifi_cs & next_byte & fast_fifo_rd_en
 --    );
 --icon_inst : ENTITY chipscope_icon_qspi
 --  port map (

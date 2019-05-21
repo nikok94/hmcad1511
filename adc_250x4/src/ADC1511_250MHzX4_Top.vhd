@@ -44,7 +44,7 @@ use work.infrastructure_module;
 use work.fifo_sream;
 use work.spi_adc_250x4_master;
 use work.QuadSPI_adc_250x4_module;
-use work.clock_generator_low_adc;
+--use work.clock_generator_low_adc;
 use work.low_adc_data_capture;
 
 
@@ -78,7 +78,9 @@ entity ADC1511_250MHzX4_Top is
     
     -- low adc
         low_adc_clk_out         : out std_logic;
-        data_9_0                : in std_logic_vector(9 downto 0)
+        data_9_0                : in std_logic_vector(9 downto 0);
+        
+        main_pll_lock           : out std_logic
         );
 end ADC1511_250MHzX4_Top;
 
@@ -105,7 +107,6 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal CLKFBIN                                  : std_logic;
     signal CLKFBOUT                                 : std_logic;
     
-    signal CLK_100MHz                               : std_logic;
     signal pll_clk0                                 : std_logic;
     
     signal bitslip_sync_vect                        : std_logic_vector(3 downto 0);
@@ -131,6 +132,8 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal m_strm_valid                             : std_logic;
     signal m_strm_ready                             : std_logic;
     
+    signal clk_100MHz                               : std_logic;
+    signal clk_100MHz_180                           : std_logic;
     signal clk_125MHz                               : std_logic;
     signal clk_250MHz                               : std_logic;
     signal stream_fifo_rst                          : std_logic;
@@ -179,72 +182,76 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_rst                              : std_logic;
     signal low_adc_buff_len                         : std_logic_vector(15 downto 0);
     signal low_channel_activ                        : std_logic;
-    signal low_adc_m_strm_data                      : std_logic_vector(15 downto 0);
+    signal low_adc_m_strm_data                      : std_logic_vector(7 downto 0);
     signal low_adc_m_strm_valid                     : std_logic;
     signal low_adc_m_strm_ready                     : std_logic;
+    signal low_adc_clk_100MHz                       : std_logic;
+    signal low_adc_clk_90_9MHz                      : std_logic;
+    signal low_adc_clk_83MHz                        : std_logic;
+    signal low_adc_clk_71_4MHz                      : std_logic;
+    signal low_adc_clk_62_5MHz                      : std_logic;
+    signal low_adc_clk_50MHz                        : std_logic;
 
 begin
+main_pll_lock <= pll_lock;
 
-low_adc_clk_out <= low_adc_clk;
 
-clock_gen_inst : clock_generator
-    Port map ( 
-      in_clk_20MHz        => in_clk_20MHz,
-      rst                 => '0',
-      pll_lock            => open,
-      out_clk_125MHz      => clk_125MHz,
-      out_clk_250MHz      => clk_250MHz,
-      out_clk_500MHz      : out std_logic
-      );
+low_adc_clk_out <= clk_100MHz_180;
 
-low_adc_clk_option :
-  process(low_adc_freq_num)
-  begin
-    low_adc_clk <= low_adc_clk_100MHz;
-      case low_adc_freq_num is
-        when b"000" =>
-          low_adc_clk <= low_adc_clk_100MHz;
-        when b"001" => 
-          low_adc_clk <= low_adc_clk_90_9MHz;
-        when b"010" =>
-          low_adc_clk <= low_adc_clk_83MHz;
-        when b"011" =>
-          low_adc_clk <= low_adc_clk_71_4MHz;
-        when b"100" =>
-          low_adc_clk <= low_adc_clk_62_5MHz;
-        when b"101" =>
-          low_adc_clk <= low_adc_clk_50MHz;
-        when others =>
-          low_adc_clk <= low_adc_clk_100MHz;
-      end case;
-  end process;
+--low_adc_clk_option :
+--  process(low_adc_freq_num)
+--  begin
+--    low_adc_clk <= low_adc_clk_100MHz;
+--      case low_adc_freq_num is
+--        when b"000" =>
+--          low_adc_clk <= low_adc_clk_100MHz;
+--        when b"001" => 
+--          low_adc_clk <= low_adc_clk_90_9MHz;
+--        when b"010" =>
+--          low_adc_clk <= low_adc_clk_83MHz;
+--        when b"011" =>
+--          low_adc_clk <= low_adc_clk_71_4MHz;
+--        when b"100" =>
+--          low_adc_clk <= low_adc_clk_62_5MHz;
+--        when b"101" =>
+--          low_adc_clk <= low_adc_clk_50MHz;
+--        when others =>
+--          low_adc_clk <= low_adc_clk_100MHz;
+--      end case;
+--  end process;
 
-low_adc_rst <= control_reg(5) or (spifi_cs_up and low_channel_activ);
+low_adc_rst <= control_reg(7) or (spifi_cs_up and low_channel_activ);
 
 low_adc_data_capture_inst : entity low_adc_data_capture
     Port map(
-      clk               => low_adc_clk,
-      rst               => low_adc_rst,
-      trig_start        => control_reg(3),
-      adc_data          => data_9_0,
+      low_adc_clk       => clk_100MHz,
+      low_adc_data      => data_9_0,
+
       buff_len          => low_adc_buff_len,
+      trig_start        => wr_req_vec(7),
+      rst               => low_adc_rst,
       
-      m_strm_data       => low_adc_m_strm_data ,
+      m_strm_clk        => clk_125MHz,
+      m_strm_data       => low_adc_m_strm_data,
       m_strm_valid      => low_adc_m_strm_valid,
       m_strm_ready      => low_adc_m_strm_ready
     );
+
+low_adc_data_valid <= low_adc_m_strm_valid;
 
 -- модуль infrastructure_module использует поделенную тактовую частоту генерируемую АЦП 
 -- поделенная тактовая частота используется для тактирования pll 
 
 infr_inst : entity infrastructure_module
     Port map( 
-      clk_in        => adc_clk_div8,
-      rst_in        => '0',
-      pll_lock      => pll_lock,
-      clk_out_125MHz=> open,
-      clk_out_250MHz=> open,
-      rst_out       => infrst_rst_out
+      clk_in                => adc_clk_div8, --in_clk_20MHz,
+      rst_in                => '0',
+      pll_lock              => pll_lock,
+      clk_out_100MHz        => clk_100MHz,
+      clk_out_100MHz_180    => clk_100MHz_180,
+      clk_out_125MHz        => clk_125MHz,
+      clk_out_250MHz        => clk_250MHz,
+      rst_out               => infrst_rst_out
     );
 
 rst <= infrst_rst_out or control_reg(1);
@@ -379,28 +386,27 @@ stream_data_capture_inst    : entity data_capture_module
 
 QuadSPI_adc_250x4_module_inst : entity QuadSPI_adc_250x4_module
     Port map(
-      clk_250MHz_in     => clk_250MHz,
-      spifi_cs          => spifi_cs  ,
-      spifi_sck         => spifi_sck ,
-      spifi_miso        => spifi_miso,
-      spifi_mosi        => spifi_mosi,
-      spifi_sio2        => spifi_sio2,
-      spifi_sio3        => spifi_sio3,
+      spifi_cs                  => spifi_cs  ,
+      spifi_sck                 => spifi_sck ,
+      spifi_miso                => spifi_miso,
+      spifi_mosi                => spifi_mosi,
+      spifi_sio2                => spifi_sio2,
+      spifi_sio3                => spifi_sio3,
       
-      s_strm_clk        => clk_125MHz,
-      s_strm_rst        => rst,
-      s_strm_data       => m_strm_data,
-      s_strm_valid      => m_strm_valid,
-      s_strm_ready      => m_strm_ready,
-      fast_adc_valid    => fast_adc_data_valid,
+      clk                       => clk_125MHz,
+      rst                       => rst,
       
-      low_channel_activ => low_channel_activ,
-      low_adc_clk          => low_adc_clk,
-      low_adc_m_strm_data  => low_adc_m_strm_data ,
-      low_adc_m_strm_valid => low_adc_m_strm_valid,
-      low_adc_m_strm_ready => low_adc_m_strm_ready,
-      low_adc_valid        => low_adc_data_valid
+      s_strm_data               => m_strm_data,
+      s_strm_valid              => m_strm_valid,
+      s_strm_ready              => m_strm_ready,
+      fast_adc_valid            => fast_adc_data_valid,
+      
+      low_channel_activ         => low_channel_activ,
+      low_adc_m_strm_data       => low_adc_m_strm_data ,
+      low_adc_m_strm_valid      => low_adc_m_strm_valid,
+      low_adc_m_strm_ready      => low_adc_m_strm_ready
     );
+    
 
 -- Модуль SPI для прогрузки управляющих регистров 
 -- размер адреса 1 байт
@@ -475,10 +481,8 @@ m_fcb_wr_process :
               trig_position_reg <= m_fcb_wrdata;
             when 3 =>
               wr_req_vec(3) <= '1';
-              control_reg(0) <= m_fcb_wrdata(0);
-              control_reg(1) <= m_fcb_wrdata(1);
-              control_reg(3) <= m_fcb_wrdata(3);
-              control_reg(5) <= m_fcb_wrdata(5);
+              control_reg(1 downto 0) <= m_fcb_wrdata(1 downto 0);
+              control_reg(7) <= m_fcb_wrdata(7);
             when 4 =>
               wr_req_vec(4) <= '1';
               calib_pattern_reg <= m_fcb_wrdata;
@@ -497,8 +501,7 @@ m_fcb_wr_process :
           m_fcb_wrack <= '0';
           wr_req_vec <= (others => '0');
           control_reg(1 downto 0) <= (others => '0');
-          control_reg(3) <= '0';
-          control_reg(5) <= '0';
+          control_reg(7) <= '0';
         end if;
         control_reg_0_d <= control_reg(0);
         adc_calib <= (not control_reg_0_d) and control_reg(0);
@@ -506,7 +509,6 @@ m_fcb_wr_process :
     end process;
 
     control_reg(2) <= pll_lock;
-    control_reg(4) <= low_adc_gen_lock;
 
 m_fcb_rd_process :
     process(clk_125MHz)
@@ -523,15 +525,14 @@ m_fcb_rd_process :
             when 2 =>
               m_fcb_rddata <= trig_position_reg;
             when 3 =>
-              m_fcb_rddata(5 downto 0) <= control_reg(5 downto 0);
-              m_fcb_rddata(15 downto 6)<= (others => '0');
+              m_fcb_rddata(2 downto 0) <= control_reg(2 downto 0);
+              m_fcb_rddata(15 downto 3)<= (others => '0');
             when 4 =>
               m_fcb_rddata <= calib_pattern_reg;
             when 6 => 
               m_fcb_rddata <= low_adc_buff_len;
             when 7 => 
-              m_fcb_rddata(2 downto 0) <= low_adc_freq_num;
-              m_fcb_rddata(15 downto 3) <= (others => '0');
+              m_fcb_rddata(15 downto 0) <= (others => '0');
             when others =>
           end case;
         else 
