@@ -167,7 +167,7 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal trig_position_reg                        : std_logic_vector(15 downto 0):= x"0800";
     signal control_reg                              : std_logic_vector(15 downto 0):= (others => '0');
     signal calib_pattern_reg                        : std_logic_vector(15 downto 0):= x"55AA";
-    signal wr_req_vec                               : std_logic_vector(7 downto 0);
+    signal wr_req_vec                               : std_logic_vector(5 downto 0);
     signal reg_address_int                          : integer;
     signal pll_lock                                 : std_logic;
     signal qspi_compleat                            : std_logic;
@@ -193,34 +193,21 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_clk_50MHz                        : std_logic;
 
 begin
-main_pll_lock <= pll_lock;
-
 
 low_adc_clk_out <= clk_100MHz_180;
 
---low_adc_clk_option :
---  process(low_adc_freq_num)
---  begin
---    low_adc_clk <= low_adc_clk_100MHz;
---      case low_adc_freq_num is
---        when b"000" =>
---          low_adc_clk <= low_adc_clk_100MHz;
---        when b"001" => 
---          low_adc_clk <= low_adc_clk_90_9MHz;
---        when b"010" =>
---          low_adc_clk <= low_adc_clk_83MHz;
---        when b"011" =>
---          low_adc_clk <= low_adc_clk_71_4MHz;
---        when b"100" =>
---          low_adc_clk <= low_adc_clk_62_5MHz;
---        when b"101" =>
---          low_adc_clk <= low_adc_clk_50MHz;
---        when others =>
---          low_adc_clk <= low_adc_clk_100MHz;
---      end case;
---  end process;
+low_adc_rst_proc :
+    process(clk_125MHz)
+    begin
+      if rising_edge(clk_125MHz) then
+        if (control_reg(5) = '1') or ((spifi_cs_up = '1') and (low_channel_activ = '1')) then
+          low_adc_rst <= '1';
+        else 
+          low_adc_rst <= '0';
+        end if;
+      end if;
+    end process;
 
-low_adc_rst <= control_reg(7) or (spifi_cs_up and low_channel_activ);
 
 low_adc_data_capture_inst : entity low_adc_data_capture
     Port map(
@@ -228,16 +215,17 @@ low_adc_data_capture_inst : entity low_adc_data_capture
       low_adc_data      => data_9_0,
 
       buff_len          => low_adc_buff_len,
-      trig_start        => wr_req_vec(7),
+      trig_start        => control_reg(6),
       rst               => low_adc_rst,
       
       m_strm_clk        => clk_125MHz,
       m_strm_data       => low_adc_m_strm_data,
-      m_strm_valid      => low_adc_m_strm_valid,
-      m_strm_ready      => low_adc_m_strm_ready
+      m_strm_valid      => open,
+      m_strm_ready      => low_adc_m_strm_ready,
+      
+      buf_data_valid    => low_adc_data_valid
     );
 
-low_adc_data_valid <= low_adc_m_strm_valid;
 
 -- модуль infrastructure_module использует поделенную тактовую частоту генерируемую АЦП 
 -- поделенная тактовая частота используется для тактирования pll 
@@ -246,7 +234,7 @@ infr_inst : entity infrastructure_module
     Port map( 
       clk_in                => adc_clk_div8, --in_clk_20MHz,
       rst_in                => '0',
-      pll_lock              => pll_lock,
+      pll_lock              => main_pll_lock,
       clk_out_100MHz        => clk_100MHz,
       clk_out_100MHz_180    => clk_100MHz_180,
       clk_out_125MHz        => clk_125MHz,
@@ -317,7 +305,7 @@ trigger_capture_channel_1 : entity trigger_capture
       clk               => clk_125MHz,
       rst               => rst,
       control_reg       => trig_set_up_reg,
-      control_reg_wr_en => wr_req_vec(5),
+      control_reg_wr_en => control_reg(4),
 
       data              => m_stream_data(31 downto 0),   -- входные значения данных от АЦП
       ext_trig          => ext_trig,        -- внешний триггер
@@ -333,7 +321,7 @@ trigger_capture_channel_2 : entity trigger_capture
       clk               => clk_125MHz,
       rst               => rst,
       control_reg       => trig_set_up_reg,
-      control_reg_wr_en => wr_req_vec(5),
+      control_reg_wr_en => control_reg(4),
 
       data              => m_stream_data(63 downto 32),   -- входные значения данных от АЦП
       ext_trig          => ext_trig,        -- внешний триггер
@@ -481,34 +469,26 @@ m_fcb_wr_process :
               trig_position_reg <= m_fcb_wrdata;
             when 3 =>
               wr_req_vec(3) <= '1';
+              trig_set_up_reg(1 downto 0) <= m_fcb_wrdata(3 downto 2);
               control_reg(1 downto 0) <= m_fcb_wrdata(1 downto 0);
-              control_reg(7) <= m_fcb_wrdata(7);
+              control_reg(6 downto 4) <= m_fcb_wrdata(6 downto 4);
             when 4 =>
               wr_req_vec(4) <= '1';
               calib_pattern_reg <= m_fcb_wrdata;
             when 5 =>
               wr_req_vec(5) <= '1';
-              trig_set_up_reg(1 downto 0) <= m_fcb_wrdata(1 downto 0);
-            when 6 =>
-              wr_req_vec(6) <= '1';
               low_adc_buff_len <= m_fcb_wrdata;
-            when 7 =>
-              wr_req_vec(7) <= '1';
-              low_adc_freq_num <= m_fcb_wrdata(2 downto 0);
             when others =>
           end case;
         else 
           m_fcb_wrack <= '0';
           wr_req_vec <= (others => '0');
-          control_reg(1 downto 0) <= (others => '0');
-          control_reg(7) <= '0';
+          control_reg <= (others => '0');
         end if;
         control_reg_0_d <= control_reg(0);
         adc_calib <= (not control_reg_0_d) and control_reg(0);
       end if;
     end process;
-
-    control_reg(2) <= pll_lock;
 
 m_fcb_rd_process :
     process(clk_125MHz)
@@ -519,20 +499,19 @@ m_fcb_rd_process :
           m_fcb_rdack <= '1';
           case reg_address_int is
             when 0 => 
-              m_fcb_rddata <= trig_set_up_reg;
+              m_fcb_rddata(15 downto 2) <= trig_set_up_reg(15 downto 2);
             when 1 => 
               m_fcb_rddata <= trig_window_width_reg;
             when 2 =>
               m_fcb_rddata <= trig_position_reg;
             when 3 =>
-              m_fcb_rddata(2 downto 0) <= control_reg(2 downto 0);
+              m_fcb_rddata(1 downto 0) <= (others => '0');
+              m_fcb_rddata(3 downto 2) <= trig_set_up_reg(1 downto 0);
               m_fcb_rddata(15 downto 3)<= (others => '0');
             when 4 =>
               m_fcb_rddata <= calib_pattern_reg;
-            when 6 => 
+            when 5 => 
               m_fcb_rddata <= low_adc_buff_len;
-            when 7 => 
-              m_fcb_rddata(15 downto 0) <= (others => '0');
             when others =>
           end case;
         else 

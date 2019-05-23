@@ -154,11 +154,7 @@ old_data_byte_process :
   process(clk)
   begin
     if rising_edge(clk) then
-      if rst = '1' then
-        old_data_byte   <= (others => '0');
-      else
         old_data_byte <= data(c_data_width-1 downto c_data_width - 8);
-      end if;
     end if;
   end process;
 
@@ -169,7 +165,7 @@ level_up_compare_proc:
   process(clk)
   begin
     if rising_edge(clk) then
-      if (data_to_compare(8*i + 7 downto 8*i) > data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and (data_to_compare(8*i + 7 downto 8*i) >= capture_level)) then
+      if (data_to_compare(8*i + 7 downto 8*i) > data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and data_to_compare(8*i + 7 downto 8*i) >= capture_level and data_to_compare(8*(i-1) + 7 downto 8*(i-1)) < capture_level) then
         level_up_vect(i-1) <= '1';
       else
         level_up_vect(i-1) <= '0';
@@ -181,7 +177,7 @@ level_down_compare_proc:
   process(clk)
   begin
     if rising_edge(clk) then
-      if (data_to_compare(8*i + 7 downto 8*i) < data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and (data_to_compare(8*i + 7 downto 8*i) <= capture_level)) then
+      if (data_to_compare(8*i + 7 downto 8*i) < data_to_compare(8*(i-1) + 7 downto 8*(i-1)) and data_to_compare(8*i + 7 downto 8*i) <= capture_level and data_to_compare(8*(i-1) + 7 downto 8*(i-1)) > capture_level)then
         level_down_vect(i-1) <= '1';
       else
         level_down_vect(i-1) <= '0';
@@ -191,7 +187,24 @@ level_down_compare_proc:
   
 end generate generate_process;
 
-level_up <= '1' when (level_up_vect /= 0) else '0';
-level_down <= '1' when (level_down_vect /= 0) else '0';
+level_up <= '1' when level_up_vect /= 0 else '0';
+level_down <= '1' when level_down_vect /= 0 else '0';
+
+--level_trig_proc :
+--process(clk)
+--begin 
+--  if rising_edge(clk) then
+--      if (level_up_vect /= 0) then
+--        level_up <= '1';
+--      else
+--        level_up <= '0';
+--      end if;
+--      if (level_down_vect /= 0) then
+--        level_down <= '1';
+--      else
+--        level_down <= '0';
+--      end if;
+--  end if;
+--end process;
 
 end Behavioral;

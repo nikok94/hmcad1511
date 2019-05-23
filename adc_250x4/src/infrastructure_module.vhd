@@ -121,6 +121,7 @@ PLL_BASE_inst : PLL_BASE
       RST => rst_in            -- 1-bit input: Reset input
    );
 pll_lock <= LOCKED;
+
 bufg1_inst : BUFG port map ( I => CLKFBOUT, O => CLKFBOUT_bufg);
 bufg2_inst : BUFG port map ( I => pll_clkout_0, O => clk_out_125MHz);
 bufg3_inst : BUFG port map ( I => pll_clkout_1, O => clk_out_250MHz);
