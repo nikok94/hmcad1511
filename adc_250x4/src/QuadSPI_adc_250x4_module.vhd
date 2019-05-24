@@ -219,7 +219,7 @@ fast_adc_fifo_inst : ENTITY fifo_64_8
     rst     => fast_fifo_rst,
     wr_clk  => clk,
     rd_clk  => clk,
-    din     => s_strm_data,
+    din     => s_strm_data(7 downto 0) & s_strm_data(15 downto 8) & s_strm_data(23 downto 16) & s_strm_data(31 downto 24) & s_strm_data(39 downto 32) & s_strm_data(47 downto 40) & s_strm_data(55 downto 48) & s_strm_data(63 downto 56),
     wr_en   => fast_fifo_wr_en,
     rd_en   => fast_fifo_rd_en,
     dout    => fast_fifo_dout ,

@@ -97,6 +97,8 @@ control_reg_process :
       elsif (control_reg_wr_en = '1') then
         capture_mode <= control_reg(1 downto 0);
         capture_level <= control_reg(15 downto 8);
+      else 
+        capture_level <= control_reg(15 downto 8);
       end if;
     end if;
   end process;

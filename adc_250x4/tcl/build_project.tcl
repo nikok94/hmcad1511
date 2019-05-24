@@ -6,6 +6,7 @@
 set root_dir [ file normalize [file dirname [info script]]/../ ]
 set device "xc6slx9tqg144-2"
 set prj_name "ADC1511_250MHzX4"
+set language "VHDL"
 
 # Create project
 create_project $prj_name -force $root_dir/prj
@@ -23,8 +24,8 @@ set_property "target_language" "VHDL" $obj
 add_files -norecurse ../src/ADC1511_250MHzX4_Top.vhd
 add_files -norecurse ../src/data_capture_module.vhd
 add_files -norecurse ../src/infrastructure_module.vhd
+add_files -norecurse ../src/low_adc_data_capture.vhd
 add_files -norecurse ../src/QuadSPI_adc_250x4_module.vhd
-add_files -norecurse ../src/QuadSpi_x4_8byte_tranceiver.vhd
 add_files -norecurse ../src/trigger_capture.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_adc_250x4_master.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_receiver.vhd
@@ -32,10 +33,12 @@ add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_transceiver.vhd
 add_files -norecurse ../src/hmcad1511/high_speed_clock_to_serdes.vhd
 add_files -norecurse ../src/hmcad1511/HMCAD1511_v1_01.vhd
 add_files -norecurse ../src/hmcad1511/lvds_deserializer.vhd
-add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/blk_mem_gen_v7_3_0/mem_64_4096.xci
+add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci
-add_files -norecurse ../src/clock_generator_low_adc.vhd
+add_files -norecurse ../src/fifo_generator_v9_3_2/fifo_low_adc_8196.xci
+add_files -norecurse ../src/fifo_generator_v9_3_3/fifo_10x16.xci
+
 ########################################################################
 # UCF
 add_files -fileset [current_fileset -constrset] -norecurse ../ucf/ADC1511_250MHzX4_constr.ucf
@@ -51,5 +54,4 @@ set_property target_constrs_file ../ucf/ADC1511_250MHzX4_constr.ucf [current_fil
 #
 #update_compile_order -fileset sim_1
 
-set_property "top" "ADC1511_250MHzX4_Top" $obj
 
