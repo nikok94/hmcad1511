@@ -60,17 +60,17 @@ architecture Behavioral of data_capture_module is
     PORT (
         clka : IN STD_LOGIC;
         wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-        addra : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+        addra : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
         dina : IN STD_LOGIC_VECTOR(63 DOWNTO 0);
         clkb : IN STD_LOGIC;
-        addrb : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+        addrb : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
         doutb : OUT STD_LOGIC_VECTOR(63 DOWNTO 0)
     );
     END component mem_64_4096;
     
     type state_machine is (edle, wait_trigger_start, capture, send_buff_data, rd_addr_edge);
     signal state, next_state    : state_machine;
-    constant c_memory_max_width : std_logic_vector(c_max_window_size_width - 1 downto 0):= x"1000";
+    constant c_memory_max_width : std_logic_vector(c_max_window_size_width - 1 downto 0):= x"0200";
     signal wr_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal rd_addr              : std_logic_vector(c_max_window_size_width - 1 downto 0);
     signal s_ready              : std_logic;
@@ -215,10 +215,10 @@ memory_inst : mem_64_4096
   PORT MAP(
     clka    => clk,
     wea(0)  => wr_en,
-    addra   => wr_addr(11 downto 0),
+    addra   => wr_addr(8 downto 0),
     dina    => s_strm_data,
     clkb    => clk,
-    addrb   => rd_addr(11 downto 0),
+    addrb   => rd_addr(8 downto 0),
     doutb   => m_strm_data
   );
 

@@ -163,7 +163,7 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal m_fcb_rdack                              : std_logic;
 
     signal trig_set_up_reg                          : std_logic_vector(15 downto 0):= x"7f00";
-    signal trig_window_width_reg                    : std_logic_vector(15 downto 0):= x"1000";
+    signal trig_window_width_reg                    : std_logic_vector(15 downto 0):= x"0200";
     signal trig_position_reg                        : std_logic_vector(15 downto 0):= x"0800";
     signal control_reg                              : std_logic_vector(15 downto 0):= (others => '0');
     signal calib_pattern_reg                        : std_logic_vector(15 downto 0):= x"55AA";
@@ -191,6 +191,8 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_clk_71_4MHz                      : std_logic;
     signal low_adc_clk_62_5MHz                      : std_logic;
     signal low_adc_clk_50MHz                        : std_logic;
+    signal channel_1_set_up                         : std_logic;
+    signal channel_2_set_up                         : std_logic;
 
 begin
 
@@ -305,14 +307,14 @@ trigger_capture_channel_1 : entity trigger_capture
       clk               => clk_125MHz,
       rst               => rst,
       control_reg       => trig_set_up_reg,
-      control_reg_wr_en => control_reg(4),
+      control_reg_wr_en => channel_1_set_up,
 
       data              => m_stream_data(31 downto 0),   -- входные значения данных от АЦП
       ext_trig          => ext_trig,        -- внешний триггер
       
       trigger_start     => trigger_start_channel_1    -- выходной сигнал управляет модулем захвата данных
     );
-    
+
 trigger_capture_channel_2 : entity trigger_capture
     generic map(
         c_data_width    => 32
@@ -321,13 +323,16 @@ trigger_capture_channel_2 : entity trigger_capture
       clk               => clk_125MHz,
       rst               => rst,
       control_reg       => trig_set_up_reg,
-      control_reg_wr_en => control_reg(4),
+      control_reg_wr_en => channel_2_set_up,
 
       data              => m_stream_data(63 downto 32),   -- входные значения данных от АЦП
       ext_trig          => ext_trig,        -- внешний триггер
       
       trigger_start     => trigger_start_channel_2    -- выходной сигнал управляет модулем захвата данных
     );
+
+channel_1_set_up <= control_reg(4) when trig_set_up_reg(3) = '0' else '0';
+channel_2_set_up <= control_reg(4) when trig_set_up_reg(2) = '0' else '0';
 
 
 -- выбор управляющего канала для захвата триггера
@@ -454,6 +459,7 @@ m_fcb_wr_process :
           wr_req_vec <= (others => '0');
           control_reg(1 downto 0) <= (others => '0');
           low_adc_buff_len <= x"2004";
+          trig_window_width_reg <= x"0200";
           low_adc_freq_num <= (others => '0');
         elsif (m_fcb_wrreq = '1') then
           m_fcb_wrack <= '1';

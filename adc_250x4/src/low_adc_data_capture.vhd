@@ -82,6 +82,8 @@ architecture Behavioral of low_adc_data_capture is
     signal domen_fifo_valid : std_logic;
     signal wr_buf_status    : std_logic;
     signal rd_buf_status    : std_logic;
+    
+    signal low_adc_data_in  : std_logic_vector(15 downto 0);
 
 begin
 clock_domen_fifo : ENTITY fifo_10x16
@@ -100,18 +102,20 @@ clock_domen_fifo : ENTITY fifo_10x16
 
 domen_fifo_rd_en <= (not domen_fifo_empty);
 
+low_adc_data_in <= domen_fifo_dout(7 downto 0) & "000000" & domen_fifo_dout(9 downto 8);
+
 mem_inst : ENTITY fifo_low_adc_8196
   PORT MAP(
-    rst     => rst,
-    wr_clk     => m_strm_clk,
-    rd_clk     => m_strm_clk,
-    din     => "000000" & domen_fifo_dout,
-    wr_en   => fifo_wr_en,
-    rd_en   => fifo_rd_en,
-    dout    => m_strm_data,
-    full    => fifo_full,
-    empty   => fifo_empty,
-    valid   => fifo_valid
+    rst         => rst,
+    wr_clk      => m_strm_clk,
+    rd_clk      => m_strm_clk,
+    din         => low_adc_data_in, --"000000" & domen_fifo_dout,
+    wr_en       => fifo_wr_en,
+    rd_en       => fifo_rd_en,
+    dout        => m_strm_data,
+    full        => fifo_full,
+    empty       => fifo_empty,
+    valid       => fifo_valid
   );
 
 fifo_wr_en <= domen_fifo_valid and wr_buf_status;
