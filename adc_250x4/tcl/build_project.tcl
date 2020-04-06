@@ -26,13 +26,15 @@ add_files -norecurse ../src/data_capture_module.vhd
 add_files -norecurse ../src/infrastructure_module.vhd
 add_files -norecurse ../src/low_adc_data_capture.vhd
 add_files -norecurse ../src/QuadSPI_adc_250x4_module.vhd
+add_files -norecurse ../src/UART_RX.vhd
+add_files -norecurse ../src/UART_TX.vhd
 add_files -norecurse ../src/trigger_capture.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_adc_250x4_master.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_receiver.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_transceiver.vhd
 add_files -norecurse ../src/hmcad1511/high_speed_clock_to_serdes.vhd
 add_files -norecurse ../src/hmcad1511/HMCAD1511_v1_01.vhd
-add_files -norecurse ../src/hmcad1511/lvds_deserializer.vhd
+add_files -norecurse ../src/hmcad1511/data_deserializer.vhd
 add_files -norecurse ../src/blk_mem_gen_v7_3_0/mem_64_4096.xci
 add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci

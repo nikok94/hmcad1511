@@ -65,6 +65,9 @@ entity ADC1511_250MHzX4_Top is
         spifi_mosi              : inout std_logic;
         spifi_sio2              : inout std_logic;
         spifi_sio3              : inout std_logic;
+        
+        uart_tx                 : out std_logic;
+        uart_rx                 : in std_logic;
 
         fpga_sck                : in std_logic;
         fpga_cs                 : in std_logic;
