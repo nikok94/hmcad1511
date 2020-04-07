@@ -51,7 +51,16 @@ use work.low_adc_data_capture;
 entity ADC1511_250MHzX4_Top is
     Port (
         in_clk_20MHz            : in std_logic;
-
+        
+        adc_fclk1_p             : in std_logic;
+        adc_fclk1_n             : in std_logic;
+        
+        adc_lck1_p              : in std_logic;
+        adc_lck1_n              : in std_logic;
+        
+        
+        adc_fclk_p              : in std_logic;
+        adc_fclk_n              : in std_logic;
         adc_lck_p               : in std_logic;
         adc_lck_n               : in std_logic;
         adc_dx_a_p              : in std_logic_vector(3 downto 0);
@@ -196,8 +205,31 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_clk_50MHz                        : std_logic;
     signal channel_1_set_up                         : std_logic;
     signal channel_2_set_up                         : std_logic;
+    signal frame_byte                               : std_logic_vector(7 downto 0);
+    signal fclk1                                    : std_logic;
+    signal lck1                                     : std_logic;
 
 begin
+
+iob_fclk1_in : IBUFGDS 
+  generic map(
+    DIFF_TERM		=> true
+    )
+  port map ( 
+    I       => adc_fclk1_p,
+    IB      => adc_fclk1_n,
+    O       => fclk1
+    );
+
+iob_lck1_in : IBUFGDS 
+  generic map(
+    DIFF_TERM		=> true
+    )
+  port map ( 
+    I       => adc_lck1_p,
+    IB      => adc_lck1_n,
+    O       => lck1
+    );
 
 low_adc_clk_out <= clk_100MHz_180;
 
@@ -237,7 +269,7 @@ low_adc_data_capture_inst : entity low_adc_data_capture
 
 infr_inst : entity infrastructure_module
     Port map( 
-      clk_in                => adc_clk_div8, --in_clk_20MHz,
+      clk_in                => in_clk_20MHz,
       rst_in                => '0',
       pll_lock              => main_pll_lock,
       clk_out_100MHz        => clk_100MHz,
@@ -250,26 +282,23 @@ infr_inst : entity infrastructure_module
 rst <= infrst_rst_out or control_reg(1);
 
 adc_data_receiver : entity HMCAD1511_v1_01
-    generic map(
-      C_IDELAY_VALUE      => 12,
-      C_IODELAY_FIXED     => TRUE
-    )
     Port map(
+      FCLKp             => adc_fclk_p,
+      FCLKn             => adc_fclk_n,
       LCLKp             => adc_lck_p,
       LCLKn             => adc_lck_n,
       DxXAp             => adc_dx_a_p,
       DxXAn             => adc_dx_a_n,
       DxXBp             => adc_dx_b_p,
       DxXBn             => adc_dx_b_n,
-      CAL_DUAL_PATTERN  => calib_pattern_reg,
-      CAL               => adc_calib,
       ARESET            => rst,
-      CAL_DONE          => open,
-      CLK               => clk_125MHz,
       DIVCLK_OUT        => adc_clk_div8,
+      m_strm_aclk       => clk_125MHz,
       M_STRM_VALID      => adc_data_valid,
-      M_STRM_DATA       => adc_data_out
+      M_STRM_DATA       => adc_data_out,
+      FRAME             => frame_byte
     );
+
 stream_fifo_rst <= adc_data_valid;
 
 -- fifo_sream предназначена для перехода с тактовой частоты АЦП на частоту PLL

@@ -24,8 +24,9 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_unsigned.ALL;
 
 library work;
-use work.lvds_deserializer;
+use work.data_deserializer;
 use work.high_speed_clock_to_serdes;
+use work.async_fifo_32;
 
 --use work.chipscope_vio_3;
 --use work.ila;
@@ -41,30 +42,28 @@ library UNISIM;
 use UNISIM.VComponents.all;
 
 entity HMCAD1511_v1_01 is
-    generic (
-      C_IDELAY_VALUE        : integer := 16;
-      C_IODELAY_FIXED       : boolean := FALSE
-    );
     Port (
+      FCLKp                 : in std_logic;
+      FCLKn                 : in std_logic;
       LCLKp                 : in std_logic;
       LCLKn                 : in std_logic;
       DxXAp                 : in std_logic_vector(3 downto 0);
       DxXAn                 : in std_logic_vector(3 downto 0);
       DxXBp                 : in std_logic_vector(3 downto 0);
       DxXBn                 : in std_logic_vector(3 downto 0);
-      CAL_DUAL_PATTERN      : in std_logic_vector(15 downto 0);
-      CAL                   : in std_logic;
-      CAL_DONE              : out std_logic;
-      CLK                   : in std_logic;
+      
       ARESET                : in std_logic;
 
+      m_strm_aclk           : in std_logic;
       M_STRM_VALID          : out std_logic;
       M_STRM_DATA           : out std_logic_vector(63 downto 0);
+      FRAME                 : out std_logic_vector(7 downto 0);
       DIVCLK_OUT            : out std_logic
     );
 end HMCAD1511_v1_01;
 
 architecture Behavioral of HMCAD1511_v1_01 is
+    constant frame_pattern  : std_logic_vector(7 downto 0):= x"0f";
     type   adc_data is array(3 downto 0) of std_logic_vector(7 downto 0);
     signal adc_data_a_8bit                  : adc_data;
     signal adc_data_b_8bit                  : adc_data;
@@ -77,103 +76,38 @@ architecture Behavioral of HMCAD1511_v1_01 is
     signal serdesstrobe_1                   : std_logic;
     signal div_clk_bufg_0                   : std_logic;
     signal div_clk_bufg_1                   : std_logic;
-    signal pll_clkfbout                     : std_logic;
-    signal pll_clkfbout_bufg                : std_logic;
-    signal pll_clkfbin                      : std_logic;
-    signal pll_locked                       : std_logic;
-    signal pll_clkout0_125MHz               : std_logic;
-    signal lvds_deserializers_busy_vec      : std_logic_vector(7 downto 0);
-    signal lvds_deserializers_busy          : std_logic;
-    signal lvds_deserializers_busy_d        : std_logic;
-    signal lvds_deserializers_busy_edge     : std_logic;
-    signal lvds_deserializers_busy_fall     : std_logic;
-    signal cal_in                           : std_logic;
-    signal cal_in_d1                        : std_logic;
-    signal cal_in_d2                        : std_logic;
-    signal cal_in_d3                        : std_logic;
-    signal cal_in_sync                      : std_logic;
-    signal data_out_valid                   : std_logic;
-    signal data_out_valid_d1                : std_logic;
-    signal data_out_valid_d2                : std_logic;
-    signal data_out_valid_d3                : std_logic;
-    signal cal_done_sync                    : std_logic;
-    signal iodelay_clk                      : std_logic;
-    signal iodelay_inc                      : std_logic;
-    signal iodelay_ce                       : std_logic;
-    signal iodelay_cal                      : std_logic;
-    signal iodelay_rst                      : std_logic;
-    signal iodelay_calib                    : std_logic;
-    signal vio_calib_control                : std_logic_vector(35 downto 0);
-    signal ila_control                      : std_logic_vector(35 downto 0);
-    signal vio_calib_vector                 : std_logic_vector(3 downto 0);
-    signal vio_calib_vector_d               : std_logic_vector(3 downto 0);
-    signal data_out                         : std_logic_vector(66 downto 0);
+    signal gclk                             : std_logic;
+    signal frame_calib_valid                : std_logic;
+    signal rst                              : std_logic;
+    signal bitslip                          : std_logic;
+    signal frame_data                       : std_logic_vector(7 downto 0);
+    signal rst_counter                      : std_logic_vector(3 downto 0);
+    signal counter                          : std_logic_vector(4 downto 0);
+    signal data_calib_valid_vect            : std_logic_vector(7 downto 0);
+    type state_machine is (idle, frame_st, bitslip_st, counter_st, ready_st, rst_st, rst_cont_st);
+    signal state, next_state : state_machine;
+    signal valid                            : std_logic;
+    signal bitslip_counter                  : std_logic_vector(3 downto 0);
+    signal fifo_32_0_wr_en                  : std_logic;
+    signal fifo_32_0_rd_en                  : std_logic;
+    signal fifo_32_0_dout                   : std_logic_vector(31 downto 0);
+    signal fifo_32_0_full                   : std_logic;
+    signal fifo_32_0_empty                  : std_logic;
+    signal fifo_32_0_valid                  : std_logic;
+    signal fifo_32_1_wr_en                  : std_logic;
+    signal fifo_32_1_rd_en                  : std_logic;
+    signal fifo_32_1_dout                   : std_logic_vector(31 downto 0);
+    signal fifo_32_1_full                   : std_logic;
+    signal fifo_32_1_empty                  : std_logic;
+    signal fifo_32_1_valid                  : std_logic;
     
 
 begin
-DIVCLK_OUT <= div_clk_bufg_1;
-M_STRM_VALID <= data_out_valid;
-CAL_DONE <= cal_done_sync;
+DIVCLK_OUT <= gclk;
+FRAME <= frame_data;
 
-cal_capture_proc :
-   process(CLK)
-   begin
-     if ARESET = '1' then
-      cal_in <= '0';
-      data_out_valid_d1 <= '0';
-      data_out_valid_d2 <= '0';
-      data_out_valid_d3 <= '0';
-     elsif rising_edge(clk) then
-       if (CAL = '1') then
-         cal_in <= '1';
-       elsif data_out_valid_d2 = '1' then
-         cal_in <= '0';
-       end if;
-       data_out_valid_d1 <= data_out_valid;
-       data_out_valid_d2 <= data_out_valid_d1;
-       data_out_valid_d3 <= data_out_valid_d2;
-       cal_done_sync <= (not data_out_valid_d3) and data_out_valid_d2;
-     end if;
-   end process;
+gclk <= div_clk_bufg_1;
 
-sync_cal_in_proc :
-   process(div_clk_bufg_1)
-   begin
-     if ARESET = '1' then
-      cal_in_d1 <= '0';
-      cal_in_d2 <= '0';
-      cal_in_d3 <= '0';
-     elsif rising_edge(div_clk_bufg_1) then
-      cal_in_d1 <= cal_in;
-      cal_in_d2 <= cal_in_d1;
-      cal_in_d3 <= cal_in_d2;
-      cal_in_sync <= (not cal_in_d3) and cal_in_d2;
-     end if;
-   end process;
-
-
-lvds_deserializers_busy <=  lvds_deserializers_busy_vec(7) or lvds_deserializers_busy_vec(6) or 
-                            lvds_deserializers_busy_vec(5) or lvds_deserializers_busy_vec(4) or 
-                            lvds_deserializers_busy_vec(3) or lvds_deserializers_busy_vec(2) or 
-                            lvds_deserializers_busy_vec(1) or lvds_deserializers_busy_vec(0);
-valid_process :
-   process(div_clk_bufg_1, ARESET)
-   begin
-     if (ARESET = '1') then
-       data_out_valid <= '0';
-       lvds_deserializers_busy_edge <= '0';
-       lvds_deserializers_busy_fall <= '0';
-     elsif rising_edge(div_clk_bufg_1) then
-       lvds_deserializers_busy_d <= lvds_deserializers_busy;
-       lvds_deserializers_busy_edge <= not lvds_deserializers_busy_d and lvds_deserializers_busy;
-       lvds_deserializers_busy_fall <= not lvds_deserializers_busy and lvds_deserializers_busy_d;
-         if lvds_deserializers_busy_edge = '1' then
-           data_out_valid <= '0';
-         elsif (lvds_deserializers_busy_fall = '1') then
-           data_out_valid <= '1';
-         end if;
-       end if;
-   end process;
 
 IBUFGDS_LCLK_inst : IBUFGDS
    generic map (
@@ -187,8 +121,8 @@ IBUFGDS_LCLK_inst : IBUFGDS
 
 high_speed_clock_to_serdes_1 : entity high_speed_clock_to_serdes
     Port map( 
-        in_clk_from_bufg    => lclk_ibufg_out,
-        div_clk_bufg        => div_clk_bufg_0,
+        clkin_ibufg         => lclk_ibufg_out,
+        gclk                => div_clk_bufg_0,
         serdesclk0          => IOCLK0_0,
         serdesclk1          => IOCLK1_0,
         serdesstrobe        => serdesstrobe_0
@@ -197,123 +131,248 @@ high_speed_clock_to_serdes_1 : entity high_speed_clock_to_serdes
 high_speed_clock_to_serdes_0 : entity high_speed_clock_to_serdes
 
     Port map( 
-        in_clk_from_bufg    => lclk_ibufg_out,
-        div_clk_bufg        => div_clk_bufg_1,
+        clkin_ibufg         => lclk_ibufg_out,
+        gclk                => div_clk_bufg_1,
         serdesclk0          => IOCLK0_1,
         serdesclk1          => IOCLK1_1,
         serdesstrobe        => serdesstrobe_1
     );
-adc_deserializer_gen1 : for i in 0 to 1 generate
-lvds_deserializer_a_inst: entity lvds_deserializer
+
+frame_deserializer_a_inst : entity data_deserializer
     generic map(
-      C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_IODELAY_FIXED       => C_IODELAY_FIXED
+      DIFF_TERM         => true
     )
-    Port map( 
-      data_in_p             => DxXAp(i),
-      data_in_n             => DxXAn(i),
-      ioclk0          		=> IOCLK0_0,
-      ioclk1          		=> IOCLK1_0,
-      clkdiv         		=> div_clk_bufg_1,
-      serdesstrobe   		=> serdesstrobe_0,
-      
-      iodelay_clk           => iodelay_clk,
-      iodelay_inc           => iodelay_inc,
-      iodelay_ce            => iodelay_ce ,
-      iodelay_cal           => iodelay_cal,
-      iodelay_rst           => iodelay_rst,
-      
-      cal_dual_pattern      => cal_dual_pattern,
-      data_8bit_out         => adc_data_a_8bit(i),
-	  start_calib           => cal_in_sync,
-      calib_busy            => lvds_deserializers_busy_vec(2*i),
-	  rst					=> ARESET
+    Port map(
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => gclk,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => FCLKp,
+      data_n            => FCLKn,
+      calib_valid       => frame_calib_valid,
+      reset             => rst,
+      result            => frame_data,
+      bitslip           => bitslip,
+      data_obuf         => open
     );
 
-lvds_deserializer_b_inst: entity lvds_deserializer
+adc_deserializer_gen1 : for i in 0 to 1 generate
+
+lvds_deserializer_a_inst : entity data_deserializer
     generic map(
-      C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_IODELAY_FIXED       => C_IODELAY_FIXED
+      DIFF_TERM         => true
     )
-    Port map( 
-      data_in_p             => DxXBp(i),
-      data_in_n             => DxXBn(i),
-      ioclk0         		=> IOCLK0_0,
-      ioclk1         		=> IOCLK1_0,
-      clkdiv         		=> div_clk_bufg_1,
-      serdesstrobe   		=> serdesstrobe_0,
-      
-      iodelay_clk           => iodelay_clk,
-      iodelay_inc           => iodelay_inc,
-      iodelay_ce            => iodelay_ce ,
-      iodelay_cal           => iodelay_cal,
-      iodelay_rst           => iodelay_rst,
-      
-      cal_dual_pattern      => cal_dual_pattern,
-      data_8bit_out         => adc_data_b_8bit(i),
-	  start_calib           => cal_in_sync,
-      calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
-	  rst					=> ARESET
+    Port map(
+      serdes_clk0       => IOCLK0_0,
+      serdes_clk1       => IOCLK1_0,
+      serdes_divclk     => div_clk_bufg_0,
+      serdes_strobe     => serdesstrobe_0,
+      data_p            => DxXAp(i),
+      data_n            => DxXAn(i),
+      calib_valid       => data_calib_valid_vect(i),
+      reset             => rst,
+      result            => adc_data_a_8bit(i),
+      bitslip           => bitslip,
+      data_obuf         => open
+    );
+
+lvds_deserializer_b_inst : entity data_deserializer
+    generic map(
+      DIFF_TERM         => true
+    )
+    Port map(
+      serdes_clk0       => IOCLK0_0,
+      serdes_clk1       => IOCLK1_0,
+      serdes_divclk     => div_clk_bufg_0,
+      serdes_strobe     => serdesstrobe_0,
+      data_p            => DxXBp(i),
+      data_n            => DxXBn(i),
+      calib_valid       => data_calib_valid_vect(4 + i),
+      reset             => rst,
+      result            => adc_data_b_8bit(i),
+      bitslip           => bitslip,
+      data_obuf         => open
     );
 end generate;
 
 adc_deserializer_gen2 : for i in 2 to 3 generate
-lvds_deserializer_a_inst: entity lvds_deserializer
+
+lvds_deserializer_a_inst: entity data_deserializer
     generic map(
-      C_IDELAY_VALUE        => C_IDELAY_VALUE,
-      C_IODELAY_FIXED       => C_IODELAY_FIXED
+      DIFF_TERM         => true
     )
-    Port map( 
-      data_in_p             => DxXAp(i),
-      data_in_n             => DxXAn(i),
-      ioclk0        		=> IOCLK0_1,
-      ioclk1        		=> IOCLK1_1,
-      clkdiv        		=> div_clk_bufg_1,
-      serdesstrobe  		=> serdesstrobe_1,
-      
-      iodelay_clk           => iodelay_clk,
-      iodelay_inc           => iodelay_inc,
-      iodelay_ce            => iodelay_ce ,
-      iodelay_cal           => iodelay_cal,
-      iodelay_rst           => iodelay_rst,
-      
-      cal_dual_pattern      => cal_dual_pattern,
-      data_8bit_out         => adc_data_a_8bit(i),
-	  start_calib           => cal_in_sync,
-      calib_busy            => lvds_deserializers_busy_vec(2*i),
-	  rst					=> ARESET
+    Port map(
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => div_clk_bufg_1,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => DxXAp(i),
+      data_n            => DxXAn(i),
+      calib_valid       => data_calib_valid_vect(i),
+      reset             => rst,
+      result            => adc_data_a_8bit(i),
+      bitslip           => bitslip,
+      data_obuf         => open
     );
 
-lvds_deserializer_b_inst: entity lvds_deserializer
+lvds_deserializer_b_inst: entity data_deserializer
     generic map(
-       C_IDELAY_VALUE        => C_IDELAY_VALUE,
-       C_IODELAY_FIXED       => C_IODELAY_FIXED
+      DIFF_TERM         => true
     )
-    Port map( 
-      data_in_p             => DxXBp(i),
-      data_in_n             => DxXBn(i),
-      ioclk0         		=> IOCLK0_1,
-      ioclk1         		=> IOCLK1_1,
-      clkdiv         		=> div_clk_bufg_1,
-      serdesstrobe   		=> serdesstrobe_1,
-      
-      iodelay_clk           => iodelay_clk,
-      iodelay_inc           => iodelay_inc,
-      iodelay_ce            => iodelay_ce ,
-      iodelay_cal           => iodelay_cal,
-      iodelay_rst           => iodelay_rst,
-      
-      cal_dual_pattern      => cal_dual_pattern,
-      data_8bit_out         => adc_data_b_8bit(i),
-	  start_calib           => cal_in_sync,
-      calib_busy            => lvds_deserializers_busy_vec(2*i + 1),
-	  rst					=> ARESET
+    Port map(
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => div_clk_bufg_1,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => DxXBp(i),
+      data_n            => DxXBn(i),
+      calib_valid       => data_calib_valid_vect(4 + i),
+      reset             => rst,
+      result            => adc_data_b_8bit(i),
+      bitslip           => bitslip,
+      data_obuf         => open
     );
 end generate;
 
-    M_STRM_DATA <= adc_data_b_8bit(3) & adc_data_a_8bit(3) & 
-                   adc_data_b_8bit(2) & adc_data_a_8bit(2) & 
-                   adc_data_b_8bit(1) & adc_data_a_8bit(1) & 
-                   adc_data_b_8bit(0) & adc_data_a_8bit(0);
+fifo_32_0_inst : ENTITY async_fifo_32
+  PORT MAP(
+    rst         => rst,
+    wr_clk      => div_clk_bufg_0,
+    rd_clk      => m_strm_aclk,
+    din         => adc_data_b_8bit(1) & adc_data_a_8bit(1) & adc_data_b_8bit(0) & adc_data_a_8bit(0),
+    wr_en       => fifo_32_0_wr_en, 
+    rd_en       => fifo_32_0_rd_en,
+    dout        => fifo_32_0_dout ,
+    full        => fifo_32_0_full ,
+    empty       => fifo_32_0_empty,
+    valid       => fifo_32_0_valid
+  );
+
+fifo_32_1_inst : ENTITY async_fifo_32
+  PORT MAP(
+    rst         => rst,
+    wr_clk      => div_clk_bufg_1,
+    rd_clk      => m_strm_aclk,
+    din         => adc_data_b_8bit(3) & adc_data_a_8bit(3) & adc_data_b_8bit(2) & adc_data_a_8bit(2),
+    wr_en       => fifo_32_1_wr_en, 
+    rd_en       => fifo_32_1_rd_en,
+    dout        => fifo_32_1_dout ,
+    full        => fifo_32_1_full ,
+    empty       => fifo_32_1_empty,
+    valid       => fifo_32_1_valid
+  );
+
+fifo_32_0_wr_en <= data_calib_valid_vect(0) and data_calib_valid_vect(1) and data_calib_valid_vect(2) and data_calib_valid_vect(3);
+fifo_32_1_wr_en <= data_calib_valid_vect(4) and data_calib_valid_vect(5) and data_calib_valid_vect(6) and data_calib_valid_vect(7);
+
+M_STRM_DATA <= fifo_32_1_dout & fifo_32_0_dout;
+fifo_32_1_rd_en <= fifo_32_1_valid and fifo_32_0_valid;
+fifo_32_0_rd_en <= fifo_32_1_valid and fifo_32_0_valid;
+M_STRM_VALID <= fifo_32_1_valid and fifo_32_0_valid;
+               
+counter_proc :
+process(gclk)
+begin
+  if rising_edge(gclk) then
+    if (state = counter_st) then
+      counter <= counter + 1;
+    else
+      counter <= (others => '0');
+    end if;
+  end if;
+end process;
+
+rst_counter_proc :
+process(gclk, state)
+begin
+  if (state /= rst_st) then
+    rst_counter     <= (others => '0');
+  else
+    if rising_edge(gclk) then
+      rst_counter <= rst_counter + 1;
+    end if;
+  end if;
+end process;
+
+bitslip_counter_proc :
+process(gclk, state)
+begin
+  if (state = rst_st) then
+    bitslip_counter     <= (others => '0');
+  else
+    if rising_edge(gclk) then
+      if (state = bitslip_st) then 
+        bitslip_counter <= bitslip_counter + 1;
+      end if;
+    end if;
+  end if;
+end process;
+
+sync_proc :
+process(ARESET, gclk)
+begin
+  if (ARESET = '1') then
+    state <= idle;
+  elsif rising_edge(gclk) then
+    state <= next_state;
+  end if;
+end process;
+
+next_state_proc :
+process(state, frame_calib_valid, counter(counter'length - 1), frame_data, data_calib_valid_vect, rst_counter(rst_counter'length - 1), bitslip_counter)
+begin
+  next_state <= state;
+    case state is
+      when idle =>
+        next_state <= rst_st;
+      when frame_st =>
+        if (frame_calib_valid = '1') then
+            if (frame_data = frame_pattern) then
+              next_state <= ready_st;
+            else
+              next_state <= bitslip_st;
+            end if;
+        end if;
+      when bitslip_st =>
+          next_state <= counter_st;
+      when counter_st => 
+        if (counter(counter'length - 1) = '1') then
+          next_state <= frame_st;
+        end if;
+      when ready_st =>
+        if (frame_data /= frame_pattern) then
+          next_state <= idle;
+        end if;
+      when rst_st =>
+        if rst_counter(rst_counter'length - 1) = '1' then
+          next_state <= rst_cont_st;
+        end if;
+      when rst_cont_st =>
+        if ((frame_calib_valid = '1') and (data_calib_valid_vect = "11111111")) then
+          next_state <= frame_st;
+        end if;
+      when others =>
+        next_state <= idle;
+    end case;
+end process;
+
+out_proc :
+process(state)
+begin
+  bitslip <= '0';
+  valid <= '0';
+  rst <= '0';
+    case state is
+      when idle => 
+        rst <= '1';
+      when bitslip_st =>
+        bitslip <= '1';
+      when ready_st =>
+        valid <= '1';
+      when rst_st =>
+        rst <= '1';
+      when others =>
+    end case;
+end process;
 
 end Behavioral;

@@ -1,5 +1,5 @@
-#NET "in_clk_20MHz" LOC = P56;
-#NET "in_clk_20MHz" PERIOD = 20 MHz HIGH 50 %;
+NET "in_clk_20MHz" LOC = P56;
+NET "in_clk_20MHz" PERIOD = 20 MHz HIGH 50 %;
 
 #NET "infr_inst/clk_out_125MHz" TNM_NET = "clk_125";
 #TIMESPEC TS_clk_125 = PERIOD "clk_125" 8 ns HIGH 50 %;
@@ -10,12 +10,34 @@
 #NET "adc_fclk_p" LOC = P124 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
 #NET "adc_fclk_n" LOC = P123 | IOSTANDARD = LVDS_25 | DIFF_TERM = "TRUE";
 
+NET "adc_lck1_p" LOC = P132;
+NET "adc_lck1_p" IOSTANDARD = LVDS_25;
+NET "adc_lck1_p" DIFF_TERM = "TRUE";
+NET "adc_lck1_n" LOC = P131;
+NET "adc_lck1_n" IOSTANDARD = LVDS_25;
+NET "adc_lck1_n" DIFF_TERM = "TRUE";
+
+NET "adc_fclk1_p" LOC = P144;
+NET "adc_fclk1_p" IOSTANDARD = LVDS_25;
+NET "adc_fclk1_p" DIFF_TERM = "TRUE";
+NET "adc_fclk1_n" LOC = P143;
+NET "adc_fclk1_n" IOSTANDARD = LVDS_25;
+NET "adc_fclk1_n" DIFF_TERM = "TRUE";
+
+
 NET "adc_lck_p" LOC = P127;
 NET "adc_lck_p" IOSTANDARD = LVDS_25;
 NET "adc_lck_p" DIFF_TERM = "TRUE";
 NET "adc_lck_n" LOC = P126;
 NET "adc_lck_n" IOSTANDARD = LVDS_25;
 NET "adc_lck_n" DIFF_TERM = "TRUE";
+
+NET "adc_fclk_p" LOC = P124;
+NET "adc_fclk_p" IOSTANDARD = LVDS_25;
+NET "adc_fclk_p" DIFF_TERM = "TRUE";
+NET "adc_fclk_n" LOC = P123;
+NET "adc_fclk_n" IOSTANDARD = LVDS_25;
+NET "adc_fclk_n" DIFF_TERM = "TRUE";
 
 NET "adc_data_receiver/high_speed_clock_to_serdes_0/div_clk" TNM_NET = "lck_div8";
 TIMESPEC TS_lck_div8 = PERIOD "lck_div8" 8 ns HIGH 50 %;

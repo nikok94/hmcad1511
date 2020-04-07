@@ -40,6 +40,7 @@ add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci
 add_files -norecurse ../src/fifo_generator_v9_3_2/fifo_low_adc_8196.xci
 add_files -norecurse ../src/fifo_generator_v9_3_3/fifo_10x16.xci
+add_files -norecurse ../src/fifo_generator_v9_3_4/async_fifo_32.xci
 
 ########################################################################
 # UCF
