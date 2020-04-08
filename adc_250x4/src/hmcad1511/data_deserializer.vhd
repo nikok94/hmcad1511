@@ -23,6 +23,9 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_unsigned.ALL;
 
+library work;
+use work.async_fifo_8;
+
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
 --use IEEE.NUMERIC_STD.ALL;
@@ -43,11 +46,12 @@ entity data_deserializer is
       serdes_strobe     : in std_logic;
       data_p            : in std_logic;
       data_n            : in std_logic;
-      calib_valid       : out std_logic;
       reset             : in std_logic;
-      result            : out std_logic_vector(7 downto 0);
       bitslip           : in std_logic;
-      data_obuf         : out std_logic
+
+      clk               : in std_logic;
+      data_out          : out std_logic_vector(7 downto 0);
+      valid             : out std_logic
     );
 end data_deserializer;
 
@@ -72,10 +76,30 @@ architecture Behavioral of data_deserializer is
     signal delay_rst    : std_logic;
     signal counter      : std_logic_vector(10 downto 0);
     signal bs           : std_logic;
+    signal result       : std_logic_vector(7 downto 0);
+    signal calib_valid  : std_logic;
+    signal fifo_valid   : std_logic;
 
 begin
-data_obuf <= data_in;
 delay_busy <= busym or busys;
+
+fifo_inst : ENTITY async_fifo_8
+  PORT MAP(
+    rst         => reset,
+    wr_clk      => serdes_divclk,
+    rd_clk      => clk,
+    din         => result,
+    wr_en       => calib_valid, 
+    rd_en       => fifo_valid,
+    dout        => data_out ,
+    full        => open ,
+    empty       => open,
+    valid       => fifo_valid
+  );
+
+valid <= fifo_valid;
+
+
 
 bs_sync_proc :
 process(reset, serdes_divclk)
@@ -190,7 +214,10 @@ begin
       when counter_edge => 
         calib_valid <= '1';
       when slave_start_calib =>
+        calib_valid <= '1';
         delay_cal_s <= '1';
+      when slave_end_calib =>
+        calib_valid <= '1';
       when others =>
     end case;
 end process;

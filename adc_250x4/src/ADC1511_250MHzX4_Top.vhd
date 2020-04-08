@@ -41,7 +41,7 @@ use work.HMCAD1511_v1_01;
 use work.data_capture_module;
 use work.trigger_capture;
 use work.infrastructure_module;
-use work.fifo_sream;
+--use work.fifo_sream;
 use work.spi_adc_250x4_master;
 use work.QuadSPI_adc_250x4_module;
 --use work.clock_generator_low_adc;
@@ -203,11 +203,14 @@ architecture Behavioral of ADC1511_250MHzX4_Top is
     signal low_adc_clk_71_4MHz                      : std_logic;
     signal low_adc_clk_62_5MHz                      : std_logic;
     signal low_adc_clk_50MHz                        : std_logic;
-    signal channel_1_set_up                         : std_logic;
-    signal channel_2_set_up                         : std_logic;
+    signal trig_set_up                              : std_logic;
     signal frame_byte                               : std_logic_vector(7 downto 0);
     signal fclk1                                    : std_logic;
     signal lck1                                     : std_logic;
+    signal capture_mode                             : std_logic_vector(1 downto 0):= (others => '0');
+    signal front_condition                          : std_logic_vector(1 downto 0):= (others => '0');
+    signal capture_level                            : std_logic_vector(7 downto 0):= (others => '0');
+    signal adc_is_valid                             : std_logic_vector(1 downto 0);
 
 begin
 
@@ -292,31 +295,29 @@ adc_data_receiver : entity HMCAD1511_v1_01
       DxXBp             => adc_dx_b_p,
       DxXBn             => adc_dx_b_n,
       ARESET            => rst,
-      DIVCLK_OUT        => adc_clk_div8,
       m_strm_aclk       => clk_125MHz,
-      M_STRM_VALID      => adc_data_valid,
-      M_STRM_DATA       => adc_data_out,
-      FRAME             => frame_byte
+      M_STRM_VALID      => m_stream_valid,
+      M_STRM_DATA       => m_stream_data
     );
 
-stream_fifo_rst <= adc_data_valid;
-
--- fifo_sream предназначена для перехода с тактовой частоты АЦП на частоту PLL
--- выходная тактовая частота от PLL используется для тактирования оснвного дезайна
--- т.е. модулями захвата данных
-
-Stream_fifo_inst : ENTITY fifo_sream
-  PORT map(
-    m_aclk          => clk_125MHz,
-    s_aclk          => adc_clk_div8,
-    s_aresetn       => stream_fifo_rst,
-    s_axis_tvalid   => adc_data_valid,
-    s_axis_tready   => open,
-    s_axis_tdata    => adc_data_out,
-    m_axis_tvalid   => m_stream_valid,
-    m_axis_tready   => '1',
-    m_axis_tdata    => m_stream_data
-  );
+--stream_fifo_rst <= adc_data_valid;
+--
+---- fifo_sream предназначена для перехода с тактовой частоты АЦП на частоту PLL
+---- выходная тактовая частота от PLL используется для тактирования оснвного дезайна
+---- т.е. модулями захвата данных
+--
+--Stream_fifo_inst : ENTITY fifo_sream
+--  PORT map(
+--    m_aclk          => clk_125MHz,
+--    s_aclk          => adc_clk_div8,
+--    s_aresetn       => stream_fifo_rst,
+--    s_axis_tvalid   => adc_data_valid,
+--    s_axis_tready   => open,
+--    s_axis_tdata    => adc_data_out,
+--    m_axis_tvalid   => m_stream_valid,
+--    m_axis_tready   => '1',
+--    m_axis_tdata    => m_stream_data
+--  );
 
 fast_adc_calib_done <= m_stream_valid;
 
@@ -338,14 +339,23 @@ trigger_capture_channel_1 : entity trigger_capture
     Port map( 
       clk               => clk_125MHz,
       rst               => rst,
-      control_reg       => trig_set_up_reg,
-      control_reg_wr_en => channel_1_set_up,
 
+      capture_mode      => capture_mode, -- Задает условия запуска b01 – старт по уровню (нормальный) b10 – auto b11 –внешний 
+      front_condition   => front_condition, -- Задает условия захвата данных: b10 – по нарастающему b01 – по спадающему
+
+      capture_level     => capture_level,
+
+      trigger_set_up    => trig_set_up,
       data              => m_stream_data(31 downto 0),   -- входные значения данных от АЦП
-      ext_trig          => ext_trig,        -- внешний триггер
+      vector_valid      => open,
+      ext_trig          => ext_trig, -- внешний триггер
       
-      trigger_start     => trigger_start_channel_1    -- выходной сигнал управляет модулем захвата данных
+      l_up              => open,
+      l_down            => open,
+      
+      trigger_start     => trigger_start_channel_1 -- выходной сигнал управляет модулем захвата данных
     );
+
 
 trigger_capture_channel_2 : entity trigger_capture
     generic map(
@@ -354,27 +364,48 @@ trigger_capture_channel_2 : entity trigger_capture
     Port map( 
       clk               => clk_125MHz,
       rst               => rst,
-      control_reg       => trig_set_up_reg,
-      control_reg_wr_en => channel_2_set_up,
 
+      capture_mode      => capture_mode, -- Задает условия запуска b01 – старт по уровню (нормальный) b10 – auto b11 –внешний 
+      front_condition   => front_condition, -- Задает условия захвата данных: b10 – по нарастающему b01 – по спадающему
+
+      capture_level     => capture_level,
+
+      trigger_set_up    => trig_set_up,
       data              => m_stream_data(63 downto 32),   -- входные значения данных от АЦП
-      ext_trig          => ext_trig,        -- внешний триггер
+      vector_valid      => open,
+      ext_trig          => ext_trig, -- внешний триггер
       
-      trigger_start     => trigger_start_channel_2    -- выходной сигнал управляет модулем захвата данных
+      l_up              => open,
+      l_down            => open,
+      
+      trigger_start     => trigger_start_channel_2 -- выходной сигнал управляет модулем захвата данных
     );
 
-channel_1_set_up <= control_reg(4) when trig_set_up_reg(3) = '0' else '0';
-channel_2_set_up <= control_reg(4) when trig_set_up_reg(2) = '0' else '0';
-
+trig_set_up_proc :
+process(clk_125MHz, rst)
+begin
+  if (rst = '1') then
+    trig_set_up <= '0';
+  elsif rising_edge(clk_125MHz) then
+    if control_reg(4) = '1' then
+      trig_set_up <= '1';
+      case control_reg(3 downto 2) is
+        when "00" => capture_mode <= "10";
+        when "11" => capture_mode <= "11";
+        when others => capture_mode <= "01";
+      end case;
+    else
+      trig_set_up <= '0';
+    end if;
+  end if;
+end process;
 
 -- выбор управляющего канала для захвата триггера
 
-channel_control <= trig_set_up_reg(3 downto 2);
-
 trigger_start_mux_process:
-    process (channel_control, trigger_start_channel_1, trigger_start_channel_2)
+    process (adc_is_valid, trigger_start_channel_1, trigger_start_channel_2)
     begin
-      case channel_control is 
+      case adc_is_valid is 
          when "00" => trigger_start <= trigger_start_channel_1 or trigger_start_channel_2;
          when "01" => trigger_start <= trigger_start_channel_1;
          when "10" => trigger_start <= trigger_start_channel_2;
@@ -498,7 +529,9 @@ m_fcb_wr_process :
           case reg_address_int is
             when 0 => 
               wr_req_vec(0) <= '1';
-              trig_set_up_reg(15 downto 2) <= m_fcb_wrdata(15 downto 2);
+              adc_is_valid <= m_fcb_wrdata(3 downto 2);
+              front_condition <=  m_fcb_wrdata(1 downto 0);
+              capture_level <= m_fcb_wrdata(15 downto 8);
             when 1 => 
               wr_req_vec(1) <= '1';
               trig_window_width_reg <= m_fcb_wrdata;
@@ -507,9 +540,7 @@ m_fcb_wr_process :
               trig_position_reg <= m_fcb_wrdata;
             when 3 =>
               wr_req_vec(3) <= '1';
-              trig_set_up_reg(1 downto 0) <= m_fcb_wrdata(3 downto 2);
-              control_reg(1 downto 0) <= m_fcb_wrdata(1 downto 0);
-              control_reg(6 downto 4) <= m_fcb_wrdata(6 downto 4);
+              control_reg(6 downto 0) <= m_fcb_wrdata(6 downto 0);
             when 4 =>
               wr_req_vec(4) <= '1';
               calib_pattern_reg <= m_fcb_wrdata;

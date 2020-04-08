@@ -18,3 +18,5 @@
 !/**/src/fifo_generator_v9_3_2/fifo_low_adc_8196.xci
 /**/src/fifo_generator_v9_3_4/*
 !/**/src/fifo_generator_v9_3_4/async_fifo_32.xci
+/**/src/async_fifo_8/*
+!/**/src/async_fifo_8/async_fifo_8.xci

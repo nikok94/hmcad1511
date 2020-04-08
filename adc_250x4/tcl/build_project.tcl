@@ -33,14 +33,17 @@ add_files -norecurse ../src/SPI_ADC_250x4/spi_adc_250x4_master.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_receiver.vhd
 add_files -norecurse ../src/SPI_ADC_250x4/spi_byte_transceiver.vhd
 add_files -norecurse ../src/hmcad1511/high_speed_clock_to_serdes.vhd
+#add_files -norecurse ../src/hmcad1511/serdes_1_to_n_clk_ddr_s8_diff.v
+add_files -norecurse ../src/hmcad1511/serdes_1_to_n_data_ddr_s8_diff.v
 add_files -norecurse ../src/hmcad1511/HMCAD1511_v1_01.vhd
-add_files -norecurse ../src/hmcad1511/data_deserializer.vhd
+#add_files -norecurse ../src/hmcad1511/data_deserializer.vhd
 add_files -norecurse ../src/blk_mem_gen_v7_3_0/mem_64_4096.xci
 add_files -norecurse ../src/fifo_generator_v9_3_1/fifo_sream.xci
 add_files -norecurse ../src/fifo_generator_v9_3_0/fifo_64_8.xci
 add_files -norecurse ../src/fifo_generator_v9_3_2/fifo_low_adc_8196.xci
 add_files -norecurse ../src/fifo_generator_v9_3_3/fifo_10x16.xci
 add_files -norecurse ../src/fifo_generator_v9_3_4/async_fifo_32.xci
+add_files -norecurse ../src/async_fifo_8/async_fifo_8.xci
 
 ########################################################################
 # UCF
