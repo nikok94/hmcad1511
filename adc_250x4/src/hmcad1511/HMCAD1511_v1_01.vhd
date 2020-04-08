@@ -24,8 +24,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_unsigned.ALL;
 
 library work;
----use work.data_deserializer;
-use work.serdes_1_to_n_data_ddr_s8_diff;
+use work.data_deserializer;
+--use work.serdes_1_to_n_data_ddr_s8_diff;
 use work.high_speed_clock_to_serdes;
 --use work.async_fifo_32;
 
@@ -103,7 +103,7 @@ architecture Behavioral of HMCAD1511_v1_01 is
 
 begin
 
-M_STRM_VALID <= '1' when data_calib_valid_vect = x"ff" else '0';
+M_STRM_VALID <= valid;--'1' when data_calib_valid_vect = x"ff" else '0';
 
 
 
@@ -137,221 +137,221 @@ high_speed_clock_to_serdes_0 : entity high_speed_clock_to_serdes
     );
 
 
---frame_deserializer_a_inst : entity data_deserializer
---    generic map(
---      DIFF_TERM         => true
---    )
---    Port map(
---      serdes_clk0       => IOCLK0_1,
---      serdes_clk1       => IOCLK1_1,
---      serdes_divclk     => div_clk_bufg_1,
---      serdes_strobe     => serdesstrobe_1,
---      data_p            => FCLKp,
---      data_n            => FCLKn,
---      reset             => rst,
---      bitslip           => bitslip,
---      clk               => m_strm_aclk,
---      data_out          => frame_data,
---      valid             => frame_calib_valid
---    );
-frame_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
+frame_deserializer_a_inst : entity data_deserializer
     generic map(
-      S                     => 8,
-      D                     => 1,
-      DIFF_TERM             => "TRUE"
+      DIFF_TERM         => true
     )
     Port map(
-      use_phase_detector    => '1',
-      rxioclkp              => IOCLK0_1,
-      rxioclkn              => IOCLK1_1,
-      gclk                  => div_clk_bufg_1,
-      rxserdesstrobe        => serdesstrobe_1,
-      datain_p(0)           => FCLKp,
-      datain_n(0)           => FCLKn,
-      reset                 => rst,
-      bitslip               => bitslip,
-      debug_in              => "00",
-      data_out              => frame_data,
-      debug                 => debug_frame,
-      stat_out              => open
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => div_clk_bufg_1,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => FCLKp,
+      data_n            => FCLKn,
+      reset             => rst,
+      bitslip           => bitslip,
+      clk               => m_strm_aclk,
+      data_out          => frame_data,
+      valid             => frame_calib_valid
     );
-    frame_calib_valid <= debug_frame(1);
+--frame_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
+--    generic map(
+--      S                     => 8,
+--      D                     => 1,
+--      DIFF_TERM             => "TRUE"
+--    )
+--    Port map(
+--      use_phase_detector    => '1',
+--      rxioclkp              => IOCLK0_1,
+--      rxioclkn              => IOCLK1_1,
+--      gclk                  => div_clk_bufg_1,
+--      rxserdesstrobe        => serdesstrobe_1,
+--      datain_p(0)           => FCLKp,
+--      datain_n(0)           => FCLKn,
+--      reset                 => rst,
+--      bitslip               => bitslip,
+--      debug_in              => "00",
+--      data_out              => frame_data,
+--      debug                 => debug_frame,
+--      stat_out              => open
+--    );
+--    frame_calib_valid <= debug_frame(1);
 
 adc_deserializer_gen1 : for i in 0 to 1 generate
 
---lvds_deserializer_a_inst : entity data_deserializer
---    generic map(
---      DIFF_TERM         => true
---    )
---    Port map(
---      serdes_clk0       => IOCLK0_0,
---      serdes_clk1       => IOCLK1_0,
---      serdes_divclk     => div_clk_bufg_0,
---      serdes_strobe     => serdesstrobe_0,
---      data_p            => DxXAp(i),
---      data_n            => DxXAn(i),
---      reset             => rst,
---      bitslip           => bitslip,
---      clk               => m_strm_aclk,
---      data_out          => adc_data_a_8bit(i),
---      valid             => data_calib_valid_vect(i)
---    );
---
---lvds_deserializer_b_inst : entity data_deserializer
---    generic map(
---      DIFF_TERM         => true
---    )
---    Port map(
---      serdes_clk0       => IOCLK0_0,
---      serdes_clk1       => IOCLK1_0,
---      serdes_divclk     => div_clk_bufg_0,
---      serdes_strobe     => serdesstrobe_0,
---      data_p            => DxXBp(i),
---      data_n            => DxXBn(i),
---      reset             => rst,
---      bitslip           => bitslip,
---      clk               => m_strm_aclk,
---      data_out          => adc_data_b_8bit(i),
---      valid             => data_calib_valid_vect(4 + i)
---    );
-lvds_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
+lvds_deserializer_a_inst : entity data_deserializer
     generic map(
-      S                     => 8,
-      D                     => 1,
-      DIFF_TERM             => "TRUE"
+      DIFF_TERM         => true
     )
     Port map(
-      use_phase_detector    => '1',
-      rxioclkp              => IOCLK0_0,
-      rxioclkn              => IOCLK1_0,
-      gclk                  => div_clk_bufg_0,
-      rxserdesstrobe        => serdesstrobe_0,
-      datain_p(0)           => DxXAp(i),
-      datain_n(0)           => DxXAn(i),
-      reset                 => rst,
-      bitslip               => bitslip,
-      debug_in              => "00",
-      data_out              => adc_data_a_8bit(i),
-     -- debug(1)              => data_calib_valid_vect(i),
-     -- debug(0)              => open,
-     -- debug(8 downto 2)     => open,
-      debug                 => open,
-      stat_out              => open
+      serdes_clk0       => IOCLK0_0,
+      serdes_clk1       => IOCLK1_0,
+      serdes_divclk     => div_clk_bufg_0,
+      serdes_strobe     => serdesstrobe_0,
+      data_p            => DxXAp(i),
+      data_n            => DxXAn(i),
+      reset             => rst,
+      bitslip           => bitslip,
+      clk               => m_strm_aclk,
+      data_out          => adc_data_a_8bit(i),
+      valid             => data_calib_valid_vect(i)
     );
 
-lvds_deserializer_b_inst : entity serdes_1_to_n_data_ddr_s8_diff
+lvds_deserializer_b_inst : entity data_deserializer
     generic map(
-      S                     => 8,
-      D                     => 1,
-      DIFF_TERM             => "TRUE"
+      DIFF_TERM         => true
     )
     Port map(
-      use_phase_detector    => '1',
-      rxioclkp              => IOCLK0_0,
-      rxioclkn              => IOCLK1_0,
-      gclk                  => div_clk_bufg_0,
-      rxserdesstrobe        => serdesstrobe_0,
-      datain_p(0)           => DxXBp(i),
-      datain_n(0)           => DxXBn(i),
-      reset                 => rst,
-      bitslip               => bitslip,
-      debug_in              => "00",
-      data_out              => adc_data_b_8bit(i),
-      --debug(1)              => data_calib_valid_vect(4 + i),
-      --debug(0)              => open,
-      --debug(8 downto 2)     => open,
-      debug                 => open,
-      stat_out              => open
+      serdes_clk0       => IOCLK0_0,
+      serdes_clk1       => IOCLK1_0,
+      serdes_divclk     => div_clk_bufg_0,
+      serdes_strobe     => serdesstrobe_0,
+      data_p            => DxXBp(i),
+      data_n            => DxXBn(i),
+      reset             => rst,
+      bitslip           => bitslip,
+      clk               => m_strm_aclk,
+      data_out          => adc_data_b_8bit(i),
+      valid             => data_calib_valid_vect(4 + i)
     );
+--lvds_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
+--    generic map(
+--      S                     => 8,
+--      D                     => 1,
+--      DIFF_TERM             => "TRUE"
+--    )
+--    Port map(
+--      use_phase_detector    => '1',
+--      rxioclkp              => IOCLK0_0,
+--      rxioclkn              => IOCLK1_0,
+--      gclk                  => div_clk_bufg_0,
+--      rxserdesstrobe        => serdesstrobe_0,
+--      datain_p(0)           => DxXAp(i),
+--      datain_n(0)           => DxXAn(i),
+--      reset                 => rst,
+--      bitslip               => bitslip,
+--      debug_in              => "00",
+--      data_out              => adc_data_a_8bit(i),
+--     -- debug(1)              => data_calib_valid_vect(i),
+--     -- debug(0)              => open,
+--     -- debug(8 downto 2)     => open,
+--      debug                 => open,
+--      stat_out              => open
+--    );
+--
+--lvds_deserializer_b_inst : entity serdes_1_to_n_data_ddr_s8_diff
+--    generic map(
+--      S                     => 8,
+--      D                     => 1,
+--      DIFF_TERM             => "TRUE"
+--    )
+--    Port map(
+--      use_phase_detector    => '1',
+--      rxioclkp              => IOCLK0_0,
+--      rxioclkn              => IOCLK1_0,
+--      gclk                  => div_clk_bufg_0,
+--      rxserdesstrobe        => serdesstrobe_0,
+--      datain_p(0)           => DxXBp(i),
+--      datain_n(0)           => DxXBn(i),
+--      reset                 => rst,
+--      bitslip               => bitslip,
+--      debug_in              => "00",
+--      data_out              => adc_data_b_8bit(i),
+--      --debug(1)              => data_calib_valid_vect(4 + i),
+--      --debug(0)              => open,
+--      --debug(8 downto 2)     => open,
+--      debug                 => open,
+--      stat_out              => open
+--    );
 end generate;
 
 adc_deserializer_gen2 : for i in 2 to 3 generate
 
-lvds_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
-    generic map(
-      S                     => 8,
-      D                     => 1,
-      DIFF_TERM             => "TRUE"
-    )
-    Port map(
-      use_phase_detector    => '1',
-      rxioclkp              => IOCLK0_1,
-      rxioclkn              => IOCLK1_1,
-      gclk                  => div_clk_bufg_1,
-      rxserdesstrobe        => serdesstrobe_1,
-      datain_p(0)           => DxXAp(i),
-      datain_n(0)           => DxXAn(i),
-      reset                 => rst,
-      bitslip               => bitslip,
-      debug_in              => "00",
-      data_out              => adc_data_a_8bit(i),
-      --debug(1)              => data_calib_valid_vect(i),
-      --debug(0)              => open,
-      --debug(8 downto 2)     => open,
-      debug                 => open,
-      stat_out              => open
-    );
-
-lvds_deserializer_b_inst : entity serdes_1_to_n_data_ddr_s8_diff
-    generic map(
-      S                     => 8,
-      D                     => 1,
-      DIFF_TERM             => "TRUE"
-    )
-    Port map(
-      use_phase_detector    => '1',
-      rxioclkp              => IOCLK0_1,
-      rxioclkn              => IOCLK1_1,
-      gclk                  => div_clk_bufg_1,
-      rxserdesstrobe        => serdesstrobe_1,
-      datain_p(0)           => DxXBp(i),
-      datain_n(0)           => DxXBn(i),
-      reset                 => rst,
-      bitslip               => bitslip,
-      debug_in              => "00",
-      data_out              => adc_data_b_8bit(i),
-      --debug(1)              => data_calib_valid_vect(4 + i),
-      --debug(0)              => open,
-      --debug(8 downto 2)     => open,
-      debug                 => open,
-      stat_out              => open
-    );
-
---lvds_deserializer_a_inst: entity data_deserializer
+--lvds_deserializer_a_inst : entity serdes_1_to_n_data_ddr_s8_diff
 --    generic map(
---      DIFF_TERM         => true
+--      S                     => 8,
+--      D                     => 1,
+--      DIFF_TERM             => "TRUE"
 --    )
 --    Port map(
---      serdes_clk0       => IOCLK0_1,
---      serdes_clk1       => IOCLK1_1,
---      serdes_divclk     => div_clk_bufg_1,
---      serdes_strobe     => serdesstrobe_1,
---      data_p            => DxXAp(i),
---      data_n            => DxXAn(i),
---      reset             => rst,
---      bitslip           => bitslip,
---      clk               => m_strm_aclk,
---      data_out          => adc_data_a_8bit(i),
---      valid             => data_calib_valid_vect(i)
+--      use_phase_detector    => '1',
+--      rxioclkp              => IOCLK0_1,
+--      rxioclkn              => IOCLK1_1,
+--      gclk                  => div_clk_bufg_1,
+--      rxserdesstrobe        => serdesstrobe_1,
+--      datain_p(0)           => DxXAp(i),
+--      datain_n(0)           => DxXAn(i),
+--      reset                 => rst,
+--      bitslip               => bitslip,
+--      debug_in              => "00",
+--      data_out              => adc_data_a_8bit(i),
+--      --debug(1)              => data_calib_valid_vect(i),
+--      --debug(0)              => open,
+--      --debug(8 downto 2)     => open,
+--      debug                 => open,
+--      stat_out              => open
 --    );
 --
---lvds_deserializer_b_inst: entity data_deserializer
+--lvds_deserializer_b_inst : entity serdes_1_to_n_data_ddr_s8_diff
 --    generic map(
---      DIFF_TERM         => true
+--      S                     => 8,
+--      D                     => 1,
+--      DIFF_TERM             => "TRUE"
 --    )
 --    Port map(
---      serdes_clk0       => IOCLK0_1,
---      serdes_clk1       => IOCLK1_1,
---      serdes_divclk     => div_clk_bufg_1,
---      serdes_strobe     => serdesstrobe_1,
---      data_p            => DxXBp(i),
---      data_n            => DxXBn(i),
---      reset             => rst,
---      bitslip           => bitslip,
---      clk               => m_strm_aclk,
---      data_out          => adc_data_b_8bit(i),
---      valid             => data_calib_valid_vect(4 + i)
+--      use_phase_detector    => '1',
+--      rxioclkp              => IOCLK0_1,
+--      rxioclkn              => IOCLK1_1,
+--      gclk                  => div_clk_bufg_1,
+--      rxserdesstrobe        => serdesstrobe_1,
+--      datain_p(0)           => DxXBp(i),
+--      datain_n(0)           => DxXBn(i),
+--      reset                 => rst,
+--      bitslip               => bitslip,
+--      debug_in              => "00",
+--      data_out              => adc_data_b_8bit(i),
+--      --debug(1)              => data_calib_valid_vect(4 + i),
+--      --debug(0)              => open,
+--      --debug(8 downto 2)     => open,
+--      debug                 => open,
+--      stat_out              => open
 --    );
+
+lvds_deserializer_a_inst: entity data_deserializer
+    generic map(
+      DIFF_TERM         => true
+    )
+    Port map(
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => div_clk_bufg_1,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => DxXAp(i),
+      data_n            => DxXAn(i),
+      reset             => rst,
+      bitslip           => bitslip,
+      clk               => m_strm_aclk,
+      data_out          => adc_data_a_8bit(i),
+      valid             => data_calib_valid_vect(i)
+    );
+
+lvds_deserializer_b_inst: entity data_deserializer
+    generic map(
+      DIFF_TERM         => true
+    )
+    Port map(
+      serdes_clk0       => IOCLK0_1,
+      serdes_clk1       => IOCLK1_1,
+      serdes_divclk     => div_clk_bufg_1,
+      serdes_strobe     => serdesstrobe_1,
+      data_p            => DxXBp(i),
+      data_n            => DxXBn(i),
+      reset             => rst,
+      bitslip           => bitslip,
+      clk               => m_strm_aclk,
+      data_out          => adc_data_b_8bit(i),
+      valid             => data_calib_valid_vect(4 + i)
+    );
 end generate;
 
 M_STRM_DATA <= adc_data_b_8bit(3) & adc_data_a_8bit(3) & adc_data_b_8bit(2) & adc_data_a_8bit(2) & adc_data_b_8bit(1) & adc_data_a_8bit(1) & adc_data_b_8bit(0) & adc_data_a_8bit(0);
